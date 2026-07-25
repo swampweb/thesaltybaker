@@ -1,0 +1,203 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>The Salty Baker Finance</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" type="image/x-icon" href="/favicon.ico?v=3629">
+  <style>
+    /* v3.6.29 Dashboard Add/Edit custom row order */
+    #entryForm.entry-layout-v3629 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(180px, 1fr));
+      gap: 14px 16px;
+      align-items: end;
+    }
+    #entryForm.entry-layout-v3629 label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-weight: 700;
+    }
+    #entryForm.entry-layout-v3629 input,
+    #entryForm.entry-layout-v3629 select {
+      width: 100%;
+      min-height: 38px;
+      box-sizing: border-box;
+    }
+    #entryForm.entry-layout-v3629 .entry-type-row { grid-column: 1 / -1; }
+    #entryForm.entry-layout-v3629 .entry-account-row { grid-column: 1 / -1; }
+    #entryForm.entry-layout-v3629 .entry-date-row { grid-column: 1 / 2; }
+    #entryForm.entry-layout-v3629 .entry-customer-row { grid-column: 2 / 3; }
+    #entryForm.entry-layout-v3629 .entry-payment-row { grid-column: 3 / 4; }
+    #entryForm.entry-layout-v3629 .entry-amount-row { grid-column: 4 / 5; }
+    #entryForm.entry-layout-v3629 .entry-notes-row { grid-column: 1 / -1; }
+    #entryForm.entry-layout-v3629 .form-actions {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-start;
+      align-items: center;
+    }
+    #entryForm.entry-layout-v3629 .choice-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    @media (max-width: 900px) {
+      #entryForm.entry-layout-v3629 { grid-template-columns: 1fr 1fr; }
+      #entryForm.entry-layout-v3629 .entry-date-row,
+      #entryForm.entry-layout-v3629 .entry-customer-row,
+      #entryForm.entry-layout-v3629 .entry-payment-row,
+      #entryForm.entry-layout-v3629 .entry-amount-row { grid-column: auto; }
+    }
+    @media (max-width: 560px) {
+      #entryForm.entry-layout-v3629 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img src="logo.png" onerror="this.style.display='none'">
+    <div>
+      <h1>The Salty Baker Finance</h1>
+      <p>Income, Expenses, Tax Filing, and Customer Tracking</p>
+    </div>
+  </div>
+  <nav>
+    <a class="active" href="index.html">Dashboard</a>
+    <a href="reports.html">Reports</a>
+    <a href="tax.html">Tax</a>
+    <a href="admin.html">Admin</a>
+    <button class="exit-btn" type="button" onclick="exitApp()">Exit</button>
+  </nav>
+</header>
+
+<main>
+  <section class="cards">
+    <div class="card"><span>Total Income</span><strong id="totalIncome">$0.00</strong></div>
+    <div class="card"><span>Total Expenses</span><strong id="totalExpenses">$0.00</strong></div>
+    <div class="card"><span>Net Profit</span><strong id="totalProfit">$0.00</strong></div>
+    <div class="card warning"><span>Estimated Tax</span><strong id="totalTax">$0.00</strong></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Add / Edit Entry</h2>
+      <div class="filters">
+        <select id="year"></select>
+        <select id="month"><option value="all">All Months</option></select>
+      </div>
+    </div>
+
+    <form id="entryForm" class="entry-layout-v3629">
+      <input type="hidden" id="entryId">
+      <input type="hidden" id="entryType" value="Income">
+      <input type="hidden" id="account" value="Orders">
+
+      <label class="entry-type-row">Type
+        <div class="choice-row">
+          <button type="button" class="choice-btn active" data-type="Income">Income</button>
+          <button type="button" class="choice-btn" data-type="Expense">Expense</button>
+          <button type="button" class="choice-btn" data-type="Donation">Donation</button>
+        </div>
+      </label>
+
+      <label class="entry-account-row">Account
+        <div id="accountButtons" class="choice-row"></div>
+      </label>
+
+      <label class="entry-date-row">Date
+        <input id="date" type="date" required>
+      </label>
+
+      <label class="entry-customer-row">Customer / Location
+        <input id="name" list="customerList">
+        <datalist id="customerList"></datalist>
+      </label>
+
+      <label class="entry-payment-row">Payment
+        <select id="paymentType"></select>
+      </label>
+
+      <label class="entry-amount-row">Amount
+        <input id="amount" type="number" step="0.01" required>
+      </label>
+
+      <label class="entry-notes-row">Notes
+        <input id="notes">
+      </label>
+
+      <div class="form-actions">
+        <button class="primary" type="submit">Save Entry</button>
+        <button id="resetBtn" type="button">Clear</button>
+      </div>
+    </form>
+
+    <div id="lastEntryBubble" class="last-entry">
+      <b>Last Entry</b>
+      <div id="lastEntryDetails">No entry loaded.</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Customer Purchase Report</h2>
+    <div class="grid-form">
+      <label>Customer
+        <input id="customerSearch" list="customerReportList">
+        <datalist id="customerReportList"></datalist>
+      </label>
+      <button id="runCustomerReport" type="button" class="primary">Run Report</button>
+    </div>
+    <div id="customerSummary" class="mini-cards"></div>
+    <div class="table-wrap">
+      <table id="customerTable">
+        <thead><tr><th>Date</th><th>Type</th><th>Account</th><th>Payment</th><th>Amount</th><th>Notes</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Yearly Report</h2>
+      <p id="totalsNote" class="notice" style="display:none"></p>
+    </div>
+    <div class="table-wrap">
+      <table id="summaryTable">
+        <thead>
+          <tr><th>Month</th><th>Income</th><th>Cash Sales</th><th>Donations</th><th>Expenses</th><th>Net Profit</th><th>Non-Cash Gross</th><th class="filing-col">Filing Amount<br><small>Taxable Sales</small></th><th>Included Tax</th></tr>
+        </thead>
+        <tbody></tbody>
+        <tfoot>
+          <tr><th>Official Total</th><th id="footIncome">$0.00</th><th id="footCash">$0.00</th><th id="footDonations">$0.00</th><th id="footExpenses">$0.00</th><th id="footProfit">$0.00</th><th id="footNonCashGross">$0.00</th><th id="footFilingAmount">$0.00</th><th id="footTaxDue">$0.00</th></tr>
+        </tfoot>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>Monthly Inputs</h2>
+      <div class="filters">
+        <input id="search" placeholder="Search monthly inputs...">
+        <button id="exportCsv" type="button">Export Visible CSV</button>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table id="txTable">
+        <thead><tr><th>Date</th><th>Type</th><th>Account</th><th>Name</th><th>Payment</th><th>Amount</th><th>Notes</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer"></footer>
+<script src="common.js?v=3629"></script>
+<script src="app.js?v=3629"></script>
+</body>
+</html>
