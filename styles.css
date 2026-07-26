@@ -609,3 +609,16 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
 .order-details-text{
   margin:8px 0 10px!important;
 }
+
+
+/* =========================
+   COLLAPSED WEEKLY ORDER CARDS v4.1.18
+   ========================= */
+.week-group{margin-bottom:14px;}
+.week-group-title{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#f6ead7;border:1px solid var(--line);border-radius:12px;padding:8px 10px;margin:0 0 8px;color:#6b4b30;font-size:12px;font-weight:900;}
+.week-group-title b{background:#fff;border:1px solid var(--line);border-radius:999px;min-width:24px;text-align:center;padding:2px 7px;color:var(--teal-dark);}
+.collapsed-order{cursor:pointer;}
+.collapsed-order .order-card-expanded{display:none;}
+.collapsed-order.expanded .order-card-expanded{display:block;}
+.collapsed-order.expanded .tap-more-hint{display:none;}
+.tap-more-hint{margin-top:8px;color:#8a6b42;font-size:11px;font-weight:900;text-align:center;opacity:.85;}

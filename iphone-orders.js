@@ -1,4 +1,4 @@
-console.log('iphone-orders.js v1 loaded');
+console.log('iphone-orders.js v1.1 collapsed weekly cards loaded');
 
 const SUPABASE_URL = 'https://fprbzavehflzqcmxvbxx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcmJ6YXZlaGZsenFjbXh2Ynh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MjMxNzEsImV4cCI6MjA5OTk5OTE3MX0.8_D_7kx9f2as46N7ZrNhGZen25e8TGFd2ue5p1TgTvg';
@@ -31,6 +31,26 @@ function fmtDate(v){
   if(p.length!==3) return v;
   return `${p[2].padStart(2,'0')} ${MONTHS[Number(p[1])-1]||p[1]} ${p[0].slice(-2)}`;
 }
+function localDateFromISO(value){
+  if(!value) return null;
+  const p=String(value).slice(0,10).split('-').map(Number);
+  if(p.length!==3 || p.some(Number.isNaN)) return null;
+  return new Date(p[0],p[1]-1,p[2]);
+}
+function isoFromDate(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function weekGroupKey(order){
+  if(!order.pickup_date) return '9999-99-99|No Pickup Date';
+  const d=localDateFromISO(order.pickup_date);
+  if(!d) return '9999-99-99|No Pickup Date';
+  const sunday=new Date(d);
+  sunday.setDate(d.getDate()-d.getDay());
+  const saturday=new Date(sunday);
+  saturday.setDate(sunday.getDate()+6);
+  return `${isoFromDate(sunday)}|${fmtDate(isoFromDate(sunday))} - ${fmtDate(isoFromDate(saturday))}`;
+}
+
 function showMsg(text, error=false){
   const el=$('statusMessage');
   clearTimeout(msgTimer);
@@ -75,26 +95,50 @@ function updateSummary(){
   $('paidCount').textContent=paid;
   $('readyCount').textContent=ready;
 }
+window.toggleMobileCard=function(id,event){
+  if(event && event.target && event.target.closest('button,select,input,textarea,a')) return;
+  const card=document.querySelector(`[data-mobile-id="${id}"]`);
+  if(card) card.classList.toggle('expanded');
+};
+
 function card(o){
   const paid=String(o.payment_type||'').trim();
   const posted=o.status==='Posted to Finance'||!!o.posted_transaction_id;
-  return `<article class="mobile-card ${paid?'paid':''} ${posted?'posted':''}">
+  return `<article class="mobile-card collapsed-mobile-card ${paid?'paid':''} ${posted?'posted':''}" data-mobile-id="${o.id}" onclick="toggleMobileCard(${o.id}, event)">
     <div class="card-badges"><span class="badge order">Order #${o.id}</span><span class="badge pickup">Pickup ${fmtDate(o.pickup_date)}</span></div>
     <div class="card-title"><strong>${esc(o.customer_name||'')}</strong><span class="amount">${MONEY(o.total_amount)}</span></div>
     <div class="date-line"><b>Order:</b> ${fmtDate(o.order_date)}</div>
-    <div class="meta-line"><b>Status:</b> ${esc(o.status||'New Orders')} ${o.media_source?` · <b>Source:</b> ${esc(o.media_source)}`:''}</div>
-    <button class="pay-btn ${paid?'paid':''}" type="button" onclick="openPayment(${o.id})">${paid?`Paid: ${esc(paid)}`:'Payment not set'}</button>
-    ${o.details?`<div class="details">${esc(o.details)}</div>`:''}
-    <div class="card-actions">
-      <button type="button" class="ghost" onclick="openEdit(${o.id})">Edit</button>
-      ${posted?`<button type="button" class="ghost" onclick="unpostOrder(${o.id})">Unpost</button>`:`<button type="button" class="primary" onclick="postOrder(${o.id})">Post</button>`}
+    <div class="meta-line"><b>Status:</b> ${esc(o.status||'New Orders')}</div>
+    <div class="mobile-card-expanded">
+      <div class="meta-line">${o.media_source?`<b>Source:</b> ${esc(o.media_source)}`:'<b>Source:</b> -'}</div>
+      <button class="pay-btn ${paid?'paid':''}" type="button" onclick="openPayment(${o.id})">${paid?`Paid: ${esc(paid)}`:'Payment not set'}</button>
+      ${o.details?`<div class="details">${esc(o.details)}</div>`:''}
+      <div class="card-actions">
+        <button type="button" class="ghost" onclick="openEdit(${o.id})">Edit</button>
+        ${posted?`<button type="button" class="ghost" onclick="unpostOrder(${o.id})">Unpost</button>`:`<button type="button" class="primary" onclick="postOrder(${o.id})">Post</button>`}
+      </div>
     </div>
+    <div class="tap-more-hint">Tap card for details</div>
   </article>`;
 }
+function renderWeekGroups(rows){
+  if(!rows.length) return '<div class="empty-state">No orders found.</div>';
+  const groups=new Map();
+  rows.forEach(order=>{
+    const key=weekGroupKey(order);
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push(order);
+  });
+  return [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,items])=>{
+    const label=key.split('|')[1];
+    return `<section class="mobile-week-group"><div class="mobile-week-title"><span>${label}</span><b>${items.length}</b></div>${items.map(card).join('')}</section>`;
+  }).join('');
+}
+
 function render(){
   updateSummary();
   const rows=filteredOrders();
-  $('ordersList').innerHTML=rows.length?rows.map(card).join(''):'<div class="empty-state">No orders found.</div>';
+  $('ordersList').innerHTML=renderWeekGroups(rows);
 }
 function openModal(){
   $('orderModal').classList.add('show');

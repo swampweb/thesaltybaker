@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.17 compact order card loaded');
+console.log('orders.js v4.1.18 collapsed weekly cards loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -19,6 +19,40 @@ function formatOrderDate(value){
   const day = parts[2].padStart(2,'0');
   return `${day} ${month} ${year}`;
 }
+
+function localDateFromISO(value){
+  if(!value) return null;
+  const parts = String(value).slice(0,10).split('-').map(Number);
+  if(parts.length !== 3 || parts.some(Number.isNaN)) return null;
+  return new Date(parts[0], parts[1]-1, parts[2]);
+}
+function isoFromDate(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function weekGroupKey(order){
+  if(!order.pickup_date) return '9999-99-99|No Pickup Date';
+  const d = localDateFromISO(order.pickup_date);
+  if(!d) return '9999-99-99|No Pickup Date';
+  const sunday = new Date(d);
+  sunday.setDate(d.getDate() - d.getDay());
+  const saturday = new Date(sunday);
+  saturday.setDate(sunday.getDate() + 6);
+  return `${isoFromDate(sunday)}|${formatOrderDate(isoFromDate(sunday))} - ${formatOrderDate(isoFromDate(saturday))}`;
+}
+function renderWeekGroups(list){
+  if(!list.length) return '<p class="empty-column">Drop orders here.</p>';
+  const groups = new Map();
+  list.forEach(order => {
+    const key = weekGroupKey(order);
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(order);
+  });
+  return [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,items]) => {
+    const label = key.split('|')[1];
+    return `<div class="week-group"><div class="week-group-title"><span>${label}</span><b>${items.length}</b></div>${items.map(orderCard).join('')}</div>`;
+  }).join('');
+}
+
 
 let currentPhotoData = '';
 let allOrders = [];
@@ -234,6 +268,13 @@ async function deleteLinkedTransaction(transactionId){
   await rest(`/transactions?id=eq.${encodeURIComponent(transactionId)}`, {method:'DELETE'});
 }
 
+function toggleOrderCard(cardId, event){
+  if(event && event.target && event.target.closest('button,select,input,textarea,a')) return;
+  const card = document.querySelector(`[data-id="${cardId}"]`);
+  if(card) card.classList.toggle('expanded');
+}
+window.toggleOrderCard = toggleOrderCard;
+
 function orderCard(order){
   const posted = !!order.posted_transaction_id || order.status === 'Posted to Finance';
   const paymentType = String(order.payment_type || '').trim();
@@ -243,7 +284,7 @@ function orderCard(order){
     ? ''
     : `<button type="button" class="payment-pill-btn ${paymentType ? 'paid' : 'unpaid'}" onclick="setOrderPayment(${order.id})">${paymentType ? `Paid: ${escapeO(paymentType)}` : 'Payment not set'}</button>`;
 
-  return `<article class="board-card cleaner-order-card ${paymentType ? 'paid-order-card' : ''}" draggable="true" data-id="${order.id}">
+  return `<article class="board-card cleaner-order-card collapsed-order ${paymentType ? 'paid-order-card' : ''}" draggable="true" data-id="${order.id}" onclick="toggleOrderCard(${order.id}, event)">
     <div class="order-card-badges">
       <span class="order-number">Order #${order.id}</span>
       <span class="pickup-date-bubble">Pickup ${pickupDate}</span>
@@ -256,13 +297,16 @@ function orderCard(order){
     <div class="board-meta clean-meta">
       <div><b>Source:</b> ${escapeO(order.media_source || '-')}</div>
     </div>
-    <div class="payment-status-row">${paymentButton}</div>
-    ${order.details ? `<p class="order-details-text">${escapeO(order.details).slice(0,180)}</p>` : ''}
-    <div class="board-actions clean-actions compact-actions">
-      <button type="button" class="soft-btn small-action-btn" onclick="editOrder(${order.id})">Edit</button>
-      ${posted ? `<span class="posted-label small-posted-label">Posted</span><button type="button" class="soft-btn small-action-btn" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary post-btn small-action-btn" onclick="postOrder(${order.id})">Post</button>`}
-      <button type="button" class="danger delete-btn small-action-btn" onclick="deleteOrder(${order.id})">Delete</button>
+    <div class="order-card-expanded">
+      <div class="payment-status-row">${paymentButton}</div>
+      ${order.details ? `<p class="order-details-text">${escapeO(order.details).slice(0,180)}</p>` : ''}
+      <div class="board-actions clean-actions compact-actions">
+        <button type="button" class="soft-btn small-action-btn" onclick="editOrder(${order.id})">Edit</button>
+        ${posted ? `<span class="posted-label small-posted-label">Posted</span><button type="button" class="soft-btn small-action-btn" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary post-btn small-action-btn" onclick="postOrder(${order.id})">Post</button>`}
+        <button type="button" class="danger delete-btn small-action-btn" onclick="deleteOrder(${order.id})">Delete</button>
+      </div>
     </div>
+    <div class="tap-more-hint">Tap card for details</div>
   </article>`;
 }
 
@@ -291,11 +335,11 @@ async function renderBoard(){
       const id=statusId(status);
       const listEl=$o(`list${id}`);
       const countEl=$o(`count${id}`);
-      if(listEl) listEl.innerHTML = list.map(orderCard).join('') || '<p class="empty-column">Drop orders here.</p>';
+      if(listEl) listEl.innerHTML = renderWeekGroups(list);
       if(countEl) countEl.textContent = list.length;
     });
     const cancelled = allOrders.filter(o=>o.status==='Cancelled');
-    if($o('cancelledOrders')) $o('cancelledOrders').innerHTML = cancelled.map(orderCard).join('') || '<p>No cancelled orders.</p>';
+    if($o('cancelledOrders')) $o('cancelledOrders').innerHTML = renderWeekGroups(cancelled).replace('Drop orders here.','No cancelled orders.');
     bindDragDrop();
   }catch(err){
     setStatus('Board load failed: ' + escapeO(err.message || err), true);
