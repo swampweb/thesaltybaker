@@ -406,3 +406,33 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
   .dashboard-summary-cards,
   .entry-form-clean{grid-template-columns:1fr;}
 }
+
+
+/* =========================
+   ORDER CARD PAYMENT STATUS v4.1.15
+   ========================= */
+.paid-order-card{
+  border-left-color:#3c835a!important;
+}
+.payment-status-row{
+  margin:8px 0 4px;
+}
+.payment-paid-label,
+.payment-unpaid-label{
+  display:inline-flex;
+  align-items:center;
+  border-radius:999px;
+  padding:5px 9px;
+  font-size:12px;
+  font-weight:900;
+}
+.payment-paid-label{
+  background:#dff3df;
+  color:#2d6b2d;
+  border:1px solid #9bd49b;
+}
+.payment-unpaid-label{
+  background:#fff3dc;
+  color:#8a5a1d;
+  border:1px solid #e0bd77;
+}

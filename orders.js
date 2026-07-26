@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.14 save-null-fix loaded');
+console.log('orders.js v4.1.15 payment-on-card loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -125,9 +125,17 @@ function parseQuickText(){
 
 async function loadCustomerNames(term=''){
   try{
-    const rows = await rest('/transactions?select=customer_name&customer_name=not.is.null&limit=5000');
+    const [txRows, orderRows] = await Promise.all([
+      rest('/transactions?select=customer_name&customer_name=not.is.null&limit=5000').catch(() => []),
+      rest('/orders?select=customer_name&customer_name=not.is.null&limit=5000').catch(() => [])
+    ]);
+
     const search = String(term||'').toLowerCase();
-    customerNames = [...new Set(rows.map(r=>String(r.customer_name||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    customerNames = [...new Set([
+      ...txRows.map(r=>String(r.customer_name||'').trim()),
+      ...orderRows.map(r=>String(r.customer_name||'').trim())
+    ].filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+
     const filtered = customerNames.filter(n => !search || n.toLowerCase().includes(search)).slice(0,50);
     $o('customerNameList').innerHTML = filtered.map(n=>`<option value="${escapeO(n)}"></option>`).join('');
   }catch(err){
@@ -196,6 +204,7 @@ async function saveOrderNow(){
     }
     setStatus(`Order saved successfully. ID: ${saved?.id || 'created'}`);
     closeOrderForm();
+    await loadCustomerNames('');
     await renderBoard();
   }catch(err){
     console.error('Save failed', err);
@@ -217,12 +226,31 @@ async function deleteLinkedTransaction(transactionId){
 
 function orderCard(order){
   const posted = !!order.posted_transaction_id || order.status === 'Posted to Finance';
-  const photo = order.photo_data ? `<img class="board-photo" src="${order.photo_data}" alt="Order photo reference">` : '';
-  return `<article class="board-card" draggable="true" data-id="${order.id}">
-    <div class="order-number">Order #${order.id}</div><div class="board-card-top"><strong>${escapeO(order.customer_name)}</strong><span>${moneyO(order.total_amount)}</span></div>
-    <div class="board-meta"><div><b>Order:</b> ${order.order_date || '-'}</div><div><b>Pickup:</b> ${order.pickup_date || '-'}</div><div><b>Source:</b> ${escapeO(order.media_source || '-')}</div><div><b>Payment:</b> ${escapeO(order.payment_type || '-')}</div></div>
+  const paymentType = String(order.payment_type || '').trim();
+  const paidBadge = paymentType
+    ? `<span class="payment-paid-label">Paid: ${escapeO(paymentType)}</span>`
+    : `<span class="payment-unpaid-label">Payment not set</span>`;
+  const paymentButton = posted
+    ? ''
+    : `<button type="button" onclick="setOrderPayment(${order.id})">${paymentType ? 'Change Payment' : 'Add Payment'}</button>`;
+
+  return `<article class="board-card ${paymentType ? 'paid-order-card' : ''}" draggable="true" data-id="${order.id}">
+    <div class="order-number">Order #${order.id}</div>
+    <div class="board-card-top"><strong>${escapeO(order.customer_name)}</strong><span>${moneyO(order.total_amount)}</span></div>
+    <div class="board-meta">
+      <div><b>Order:</b> ${order.order_date || '-'}</div>
+      <div><b>Pickup:</b> ${order.pickup_date || '-'}</div>
+      <div><b>Source:</b> ${escapeO(order.media_source || '-')}</div>
+      <div><b>Payment:</b> ${paymentType ? escapeO(paymentType) : '-'}</div>
+    </div>
+    <div class="payment-status-row">${paidBadge}</div>
     ${order.details ? `<p>${escapeO(order.details).slice(0,180)}</p>` : ''}
-    <div class="board-actions"><button type="button" onclick="editOrder(${order.id})">Edit</button>${posted ? `<span class="posted-label">Posted</span><button type="button" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary" onclick="postOrder(${order.id})">Post</button>`}<button type="button" class="danger" onclick="deleteOrder(${order.id})">Delete</button></div>
+    <div class="board-actions">
+      <button type="button" onclick="editOrder(${order.id})">Edit</button>
+      ${paymentButton}
+      ${posted ? `<span class="posted-label">Posted</span><button type="button" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary" onclick="postOrder(${order.id})">Post</button>`}
+      <button type="button" class="danger" onclick="deleteOrder(${order.id})">Delete</button>
+    </div>
   </article>`;
 }
 
@@ -269,6 +297,34 @@ async function updateOrderStatus(id,status){
     await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status})});
     await renderBoard();
   }catch(err){ setStatus('Move failed: '+escapeO(err.message||err), true); }
+}
+
+async function setOrderPayment(id){
+  try{
+    const o = allOrders.find(x => Number(x.id) === Number(id));
+    if(!o) return;
+
+    const current = String(o.payment_type || '').trim() || 'Venmo';
+    const choice = prompt('Payment type for this order:\n\nApple, Cash, Cash App, Paypal, Square, Venmo, Zelle, Other', current);
+    if(choice === null) return;
+
+    const paymentType = String(choice || '').trim();
+    if(!paymentType){
+      setStatus('Payment type was not changed.', true);
+      return;
+    }
+
+    await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {
+      method:'PATCH',
+      headers:{Prefer:'return=representation'},
+      body:JSON.stringify({payment_type:paymentType})
+    });
+
+    setStatus(`Order #${id} marked paid by ${escapeO(paymentType)}.`);
+    await renderBoard();
+  }catch(err){
+    setStatus('Payment update failed: '+escapeO(err.message||err), true);
+  }
 }
 
 async function postOrder(id){
@@ -347,6 +403,7 @@ async function cancelOrder(id){ return deleteOrder(id); }
 window.editOrder
 window.editOrder = id => { const o=allOrders.find(x=>Number(x.id)===Number(id)); if(o) openOrderForm(o); };
 window.postOrder = postOrder;
+window.setOrderPayment = setOrderPayment;
 window.cancelOrder = cancelOrder;
 window.deleteOrder = deleteOrder;
 window.unpostOrder = unpostOrder;
