@@ -20,3 +20,125 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
 .board-card-top{display:flex;justify-content:space-between;gap:10px}.board-meta{font-size:12px;color:#666;margin:8px 0}.board-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
 .board-photo{width:100%;max-height:180px;object-fit:cover;border-radius:10px;margin-top:8px}.posted-label{background:#dff3df;color:#2d6b2d;border-radius:999px;padding:6px 10px;font-weight:700}.empty-column{background:#fff;border:1px dashed #cbbca8;border-radius:12px;padding:14px;color:#777;font-style:italic}
 @media(max-width:900px){.cards,.grid-4,.grid-3,.grid-2{grid-template-columns:1fr}.topbar{flex-direction:column;align-items:flex-start}}
+
+/* =========================
+   TAX PAGE POLISH v4.1.06
+   ========================= */
+.tax-rule-panel{
+  background:#fff6c9;
+  border-color:#e1b838;
+  border-left:6px solid #d9a41f;
+}
+.tax-rule-panel h2{color:#694400}
+.tax-cards{grid-template-columns:repeat(6,minmax(150px,1fr));}
+.tax-table-wrap{
+  border-radius:10px;
+  overflow:hidden;
+  border:1px solid var(--line);
+}
+.tax-table{
+  border-collapse:separate;
+  border-spacing:0;
+  table-layout:auto;
+}
+.tax-table thead th:first-child{border-top-left-radius:10px;}
+.tax-table thead th:last-child{border-top-right-radius:10px;}
+.tax-table th,
+.tax-table td{
+  vertical-align:middle;
+}
+.tax-table .filing-col,
+.tax-table .filing-amount{
+  background:#fff2b8!important;
+  color:#6b4600!important;
+  font-weight:900;
+}
+.tax-table tr.tax-row-paid td{
+  background:#e9f8e9!important;
+}
+.tax-table tr.tax-row-paid .filing-amount{
+  background:#dff3c8!important;
+}
+.money-input-col,
+.money-input-cell{
+  width:125px;
+  max-width:125px;
+}
+.currency-input{
+  display:flex;
+  align-items:center;
+  width:118px;
+  max-width:118px;
+  border:1px solid #ccbca9;
+  border-radius:10px;
+  overflow:hidden;
+  background:#fff;
+}
+.currency-input span{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:28px;
+  color:#6b5b50;
+  font-weight:900;
+  background:#f4eadb;
+  border-right:1px solid #ccbca9;
+}
+.currency-input input{
+  border:0!important;
+  border-radius:0!important;
+  width:88px!important;
+  min-width:88px!important;
+  padding:8px 8px!important;
+  background:#fff;
+}
+.actual-paid-cell{
+  font-weight:800;
+  color:#1e6372;
+  white-space:nowrap;
+}
+.tax-date-input{
+  width:138px!important;
+  padding:8px!important;
+}
+.paid-col,
+.paid-cell{
+  width:92px;
+  max-width:92px;
+}
+.paid-toggle{
+  display:inline-flex;
+  flex-direction:row!important;
+  align-items:center;
+  justify-content:flex-start;
+  gap:6px;
+  font-weight:900;
+  white-space:nowrap;
+}
+.paid-toggle input{
+  width:16px;
+  height:16px;
+  margin:0;
+}
+.paid-toggle.is-paid span{color:#2b7a34;}
+.paid-toggle.is-open span{color:#bd4f47;}
+.notes-col,
+.notes-cell{
+  width:190px;
+  max-width:190px;
+}
+.tax-notes-input{
+  width:180px!important;
+  max-width:180px!important;
+  padding:8px!important;
+}
+.tax-save-btn{
+  padding:8px 12px!important;
+}
+.month-cell{font-weight:800;color:#1e6372;}
+@media(max-width:1200px){
+  .tax-cards{grid-template-columns:repeat(3,1fr);}
+}
+@media(max-width:700px){
+  .tax-cards{grid-template-columns:1fr;}
+}
