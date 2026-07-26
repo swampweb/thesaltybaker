@@ -1,15 +1,53 @@
-console.log('orders.js v4.1.02 loaded');
+console.log('orders.js v4.1.04 self-contained loaded');
+
+// Self-contained Supabase settings for Orders page.
+// This bypasses any cached common.js header issue.
+const ORDERS_SUPABASE_URL = 'https://fprbzavehflzqcmxvbxx.supabase.co';
+const ORDERS_SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcmJ6YXZlaGZsenFjbXh2Ynh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MjMxNzEsImV4cCI6MjA5OTk5OTE3MX0.8_D_7kx9f2as46N7ZrNhGZen25e8TGFd2ue5p1TgTvg';
+const ORDERS_REST = `${ORDERS_SUPABASE_URL}/rest/v1`;
+
+const $o = id => document.getElementById(id);
+const moneyO = n => (Number(n)||0).toLocaleString(undefined,{style:'currency',currency:'USD'});
+const todayO = () => new Date().toISOString().slice(0,10);
 
 let currentPhotoData = '';
 let allOrders = [];
+let customerNames = [];
 const BOARD_STATUSES = ['New Orders','In Progress','Ready','Picked Up','Posted to Finance'];
 
-function setStatusMessage(message, isError=false){
-  const el = $('saveStatus');
+function h(extra={}){
+  return {
+    apikey: ORDERS_SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${ORDERS_SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    ...extra
+  };
+}
+
+async function rest(path, options={}){
+  const headers = h(options.headers || {});
+  const clean = {...options};
+  delete clean.headers;
+  const res = await fetch(`${ORDERS_REST}${path}`, {...clean, headers});
+  const text = await res.text();
+  let data = null;
+  try{ data = text ? JSON.parse(text) : null; }catch{ data = text; }
+  if(!res.ok){
+    throw new Error(data?.message || data?.hint || text || `Supabase error ${res.status}`);
+  }
+  return data;
+}
+
+function escapeO(value){
+  return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[ch]));
+}
+
+function setStatus(message, err=false){
+  const el = $o('saveStatus');
   if(!el){ alert(message); return; }
-  el.style.display='block';
-  el.style.background = isError ? '#ffe0e0' : '#e8f8ec';
-  el.style.borderLeftColor = isError ? '#bd4f47' : '#326725';
+  el.style.display = 'block';
+  el.style.background = err ? '#ffe0e0' : '#e8f8ec';
+  el.style.borderLeftColor = err ? '#bd4f47' : '#326725';
   el.innerHTML = message;
 }
 
@@ -21,8 +59,7 @@ function parseLooseDate(value){
   if(/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
   if(!m) return '';
-  const currentYear = new Date().getFullYear();
-  let year = m[3] ? Number(m[3]) : currentYear;
+  let year = m[3] ? Number(m[3]) : new Date().getFullYear();
   if(year < 100) year += 2000;
   return `${year}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
 }
@@ -36,8 +73,8 @@ function grabField(text, labels){
   return '';
 }
 
-function setSelectValue(selectId, value){
-  const el = $(selectId);
+function setSelectValue(id, value){
+  const el = $o(id);
   const wanted = String(value || '').trim().toLowerCase();
   if(!wanted) return;
   const found = [...el.options].find(o => String(o.value).toLowerCase() === wanted);
@@ -45,108 +82,124 @@ function setSelectValue(selectId, value){
 }
 
 function parseQuickText(){
-  const t = $('quickText').value.trim();
-  if(!t){ setStatusMessage('Type or paste order text first. Photo upload is reference-only in this version.', true); return; }
+  const t = $o('quickText').value.trim();
+  if(!t){ setStatus('Type or paste order text first. Photo upload is reference-only in this version.', true); return; }
   const name = grabField(t, ['Name']);
   const media = grabField(t, ['Media Source', 'Source']);
   const orderDate = grabField(t, ['Order Date', 'Date']);
   const pickupDate = grabField(t, ['P\\/?U Date', 'Pickup Date', 'Pick Up Date']);
   const payment = grabField(t, ['Payment', 'Paid By']);
   const total = (t.match(/(?:Total|Amount)\s*:?\s*\$?\s*([0-9]+(?:\.[0-9]{1,2})?)/i)||[])[1];
-  if(name) $('customerName').value = name;
+  if(name) $o('customerName').value = name;
   if(media) setSelectValue('mediaSource', media);
   if(payment) setSelectValue('paymentType', payment);
-  if(total) $('totalAmount').value = total;
+  if(total) $o('totalAmount').value = total;
   const od = parseLooseDate(orderDate);
   const pd = parseLooseDate(pickupDate);
-  if(od) $('orderDate').value = od;
-  if(pd) $('pickupDate').value = pd;
-  if(!$('details').value.trim()) $('details').value = t;
-  setStatusMessage('Filled what I could. Review before saving.');
+  if(od) $o('orderDate').value = od;
+  if(pd) $o('pickupDate').value = pd;
+  if(!$o('details').value.trim()) $o('details').value = t;
+  setStatus('Filled what I could. Review before saving.');
+}
+
+async function loadCustomerNames(term=''){
+  try{
+    const rows = await rest('/transactions?select=customer_name&customer_name=not.is.null&limit=5000');
+    const search = String(term||'').toLowerCase();
+    customerNames = [...new Set(rows.map(r=>String(r.customer_name||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b));
+    const filtered = customerNames.filter(n => !search || n.toLowerCase().includes(search)).slice(0,50);
+    $o('customerNameList').innerHTML = filtered.map(n=>`<option value="${escapeO(n)}"></option>`).join('');
+  }catch(err){
+    console.warn('Customer lookup failed', err);
+  }
 }
 
 function openOrderForm(order){
-  $('orderFormPanel').style.display = 'block';
-  $('formTitle').textContent = order ? 'Edit Order' : 'New Order';
+  $o('orderFormPanel').style.display = 'block';
+  $o('formTitle').textContent = order ? 'Edit Order' : 'New Order';
   clearForm(false);
   if(order){
-    $('orderId').value = order.id;
-    $('orderDate').value = order.order_date || todayISO();
-    $('pickupDate').value = order.pickup_date || '';
-    $('customerName').value = order.customer_name || '';
-    $('mediaSource').value = order.media_source || '';
-    $('details').value = order.details || '';
-    $('totalAmount').value = order.total_amount || '';
-    $('paymentType').value = order.payment_type || '';
-    $('status').value = order.status || 'New Orders';
+    $o('orderId').value = order.id;
+    $o('orderDate').value = order.order_date || todayO();
+    $o('pickupDate').value = order.pickup_date || '';
+    $o('customerName').value = order.customer_name || '';
+    $o('mediaSource').value = order.media_source || '';
+    $o('details').value = order.details || '';
+    $o('totalAmount').value = order.total_amount || '';
+    $o('paymentType').value = order.payment_type || '';
+    $o('status').value = order.status || 'New Orders';
     currentPhotoData = order.photo_data || '';
-    $('photoPreviewWrap').innerHTML = currentPhotoData ? `<img class="photo-preview" src="${currentPhotoData}">` : '';
+    $o('photoPreviewWrap').innerHTML = currentPhotoData ? `<img class="photo-preview" src="${currentPhotoData}">` : '';
   }
-  setStatusMessage('Order form ready.');
+  setStatus('Order form ready. Start typing customer name to search existing names.');
   scrollTo({top:0,behavior:'smooth'});
+  loadCustomerNames($o('customerName').value);
 }
 
-function closeOrderForm(){ $('orderFormPanel').style.display='none'; }
-
+function closeOrderForm(){ $o('orderFormPanel').style.display='none'; }
 function clearForm(resetDate=true){
-  $('orderForm').reset();
-  $('orderId').value='';
-  if(resetDate) $('orderDate').value=todayISO();
-  currentPhotoData='';
-  $('photoPreviewWrap').innerHTML='';
-  $('status').value='New Orders';
+  $o('orderForm').reset();
+  $o('orderId').value = '';
+  if(resetDate) $o('orderDate').value = todayO();
+  currentPhotoData = '';
+  $o('photoPreviewWrap').innerHTML = '';
+  $o('status').value = 'New Orders';
 }
 
 function buildPayload(){
   return {
-    id: $('orderId').value || undefined,
-    order_date: $('orderDate').value || todayISO(),
-    pickup_date: $('pickupDate').value || null,
-    customer_name: $('customerName').value.trim(),
-    media_source: $('mediaSource').value || '',
-    details: $('details').value || $('quickText').value || '',
-    total_amount: Number($('totalAmount').value) || 0,
-    payment_type: $('paymentType').value || '',
-    status: $('status').value || 'New Orders',
+    order_date: $o('orderDate').value || todayO(),
+    pickup_date: $o('pickupDate').value || null,
+    customer_name: $o('customerName').value.trim(),
+    media_source: $o('mediaSource').value || '',
+    details: $o('details').value || $o('quickText').value || '',
+    total_amount: Number($o('totalAmount').value) || 0,
+    payment_type: $o('paymentType').value || '',
+    status: $o('status').value || 'New Orders',
     photo_data: currentPhotoData || null
   };
 }
 
 async function saveOrderNow(){
-  const btn = $('saveOrderBtn');
+  const btn = $o('saveOrderBtn');
   try{
-    setStatusMessage('Saving order...');
+    setStatus('Saving order...');
     btn.disabled = true;
     btn.textContent = 'Saving...';
-    const order = buildPayload();
-    if(!order.customer_name){ setStatusMessage('Customer name is required.', true); return; }
-
-    if(typeof upsertOrder !== 'function'){
-      throw new Error('upsertOrder function is missing. common.js may be old or not loaded.');
+    const id = $o('orderId').value;
+    const payload = buildPayload();
+    if(!payload.customer_name){ setStatus('Customer name is required.', true); return; }
+    let saved;
+    if(id){
+      const data = await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify(payload)});
+      saved = data?.[0];
+    }else{
+      const data = await rest('/orders', {method:'POST', headers:{Prefer:'return=representation'}, body:JSON.stringify(payload)});
+      saved = data?.[0];
     }
-
-    console.log('Saving payload', order);
-    const saved = await upsertOrder(order);
-    console.log('Saved result', saved);
-    setStatusMessage(`Order saved successfully. ID: ${saved?.id || 'created'}`);
+    setStatus(`Order saved successfully. ID: ${saved?.id || 'created'}`);
     closeOrderForm();
     await renderBoard();
   }catch(err){
     console.error('Save failed', err);
-    setStatusMessage('Save failed: ' + escapeHtml(err.message || err), true);
+    setStatus('Save failed: ' + escapeO(err.message || err), true);
   }finally{
     btn.disabled = false;
     btn.textContent = 'Save Order';
   }
 }
 
+async function loadOrdersSelf(){
+  return await rest('/orders?select=*&order=pickup_date.asc,order_date.asc,id.asc&limit=5000');
+}
+
 function orderCard(order){
   const posted = !!order.posted_transaction_id || order.status === 'Posted to Finance';
   const photo = order.photo_data ? `<img class="board-photo" src="${order.photo_data}" alt="Order photo reference">` : '';
   return `<article class="board-card" draggable="true" data-id="${order.id}">
-    <div class="board-card-top"><strong>${escapeHtml(order.customer_name)}</strong><span>${money(order.total_amount)}</span></div>
-    <div class="board-meta"><div><b>Order:</b> ${order.order_date || '-'}</div><div><b>Pickup:</b> ${order.pickup_date || '-'}</div><div><b>Source:</b> ${escapeHtml(order.media_source || '-')}</div><div><b>Payment:</b> ${escapeHtml(order.payment_type || '-')}</div></div>
-    ${order.details ? `<p>${escapeHtml(order.details).slice(0,180)}</p>` : ''}${photo}
+    <div class="board-card-top"><strong>${escapeO(order.customer_name)}</strong><span>${moneyO(order.total_amount)}</span></div>
+    <div class="board-meta"><div><b>Order:</b> ${order.order_date || '-'}</div><div><b>Pickup:</b> ${order.pickup_date || '-'}</div><div><b>Source:</b> ${escapeO(order.media_source || '-')}</div><div><b>Payment:</b> ${escapeO(order.payment_type || '-')}</div></div>
+    ${order.details ? `<p>${escapeO(order.details).slice(0,180)}</p>` : ''}${photo}
     <div class="board-actions"><button type="button" onclick="editOrder(${order.id})">Edit</button>${posted ? '<span class="posted-label">Posted</span>' : `<button type="button" class="primary" onclick="postOrder(${order.id})">Post</button>`}<button type="button" class="danger" onclick="cancelOrder(${order.id})">Cancel</button></div>
   </article>`;
 }
@@ -165,41 +218,63 @@ function bindDragDrop(){
 
 async function renderBoard(){
   try{
-    if(typeof loadOrders !== 'function') throw new Error('loadOrders function is missing. common.js may be old or not loaded.');
-    allOrders = await loadOrders('all');
+    allOrders = await loadOrdersSelf();
     BOARD_STATUSES.forEach(status=>{
-      const list=allOrders.filter(o=>(o.status||'New Orders')===status);
+      const list = allOrders.filter(o=>(o.status||'New Orders')===status);
       const id=statusId(status);
-      const listEl=$(`list${id}`);
-      const countEl=$(`count${id}`);
-      if(listEl) listEl.innerHTML=list.map(orderCard).join('') || '<p class="empty-column">Drop orders here.</p>';
-      if(countEl) countEl.textContent=list.length;
+      const listEl=$o(`list${id}`);
+      const countEl=$o(`count${id}`);
+      if(listEl) listEl.innerHTML = list.map(orderCard).join('') || '<p class="empty-column">Drop orders here.</p>';
+      if(countEl) countEl.textContent = list.length;
     });
-    const cancelled=allOrders.filter(o=>o.status==='Cancelled');
-    if($('cancelledOrders')) $('cancelledOrders').innerHTML=cancelled.map(orderCard).join('') || '<p>No cancelled orders.</p>';
+    const cancelled = allOrders.filter(o=>o.status==='Cancelled');
+    if($o('cancelledOrders')) $o('cancelledOrders').innerHTML = cancelled.map(orderCard).join('') || '<p>No cancelled orders.</p>';
     bindDragDrop();
   }catch(err){
-    setStatusMessage('Board load failed: ' + escapeHtml(err.message || err), true);
+    setStatus('Board load failed: ' + escapeO(err.message || err), true);
   }
 }
 
 async function updateOrderStatus(id,status){
-  try{const o=allOrders.find(x=>Number(x.id)===Number(id));if(!o)return;await upsertOrder({...o,status});await renderBoard();}
-  catch(err){setStatusMessage('Move failed: '+escapeHtml(err.message||err),true);}
+  try{
+    const o=allOrders.find(x=>Number(x.id)===Number(id));
+    if(!o)return;
+    await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status})});
+    await renderBoard();
+  }catch(err){ setStatus('Move failed: '+escapeO(err.message||err), true); }
 }
 
 async function postOrder(id){
   try{
-    const o=allOrders.find(x=>Number(x.id)===Number(id)); if(!o)return;
-    if(o.posted_transaction_id){setStatusMessage('This order is already posted.', true);return;}
-    if(!o.total_amount){setStatusMessage('Total amount is required before posting.', true);return;}
-    if(confirm('Post this order to Finance as Income / Orders?')){await postOrderToFinance(o);setStatusMessage('Posted to Finance.');await renderBoard();}
-  }catch(err){setStatusMessage('Post failed: '+escapeHtml(err.message||err),true);}
+    const o = allOrders.find(x=>Number(x.id)===Number(id));
+    if(!o)return;
+    if(o.posted_transaction_id){ setStatus('This order is already posted.', true); return; }
+    if(!o.total_amount){ setStatus('Total amount is required before posting.', true); return; }
+    if(confirm('Post this order to Finance as Income / Orders?')){
+      const txPayload = {
+        transaction_date: o.order_date || todayO(),
+        entry_type: 'Income',
+        account: 'Orders',
+        customer_name: o.customer_name || '',
+        payment_type: o.payment_type || '',
+        amount: Number(o.total_amount)||0,
+        notes: `Order Board | Pickup: ${o.pickup_date||''} | Source: ${o.media_source||''} | Details: ${o.details||''}`
+      };
+      const tx = await rest('/transactions', {method:'POST', headers:{Prefer:'return=representation'}, body:JSON.stringify(txPayload)});
+      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status:'Posted to Finance', posted_transaction_id:tx?.[0]?.id || null})});
+      setStatus('Posted to Finance.');
+      await renderBoard();
+    }
+  }catch(err){ setStatus('Post failed: '+escapeO(err.message||err), true); }
 }
 
 async function cancelOrder(id){
-  try{const o=allOrders.find(x=>Number(x.id)===Number(id));if(!o)return;if(confirm('Move this order to Cancelled?')){await upsertOrder({...o,status:'Cancelled'});await renderBoard();}}
-  catch(err){setStatusMessage('Cancel failed: '+escapeHtml(err.message||err),true);}
+  try{
+    if(confirm('Move this order to Cancelled?')){
+      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status:'Cancelled'})});
+      await renderBoard();
+    }
+  }catch(err){ setStatus('Cancel failed: '+escapeO(err.message||err), true); }
 }
 
 window.editOrder = id => { const o=allOrders.find(x=>Number(x.id)===Number(id)); if(o) openOrderForm(o); };
@@ -208,23 +283,27 @@ window.cancelOrder = cancelOrder;
 
 async function init(){
   try{
-    $('nav').innerHTML = nav({key:'orders', title:'Order Board', subtitle:'Digital workflow for paper order tickets'});
-    $('footer').innerHTML = footer();
-    $('orderDate').value = todayISO();
-    $('newOrderBtn').addEventListener('click',()=>openOrderForm(null));
-    $('refreshBtn').addEventListener('click',renderBoard);
-    $('closeFormBtn').addEventListener('click',closeOrderForm);
-    $('parseBtn').addEventListener('click',parseQuickText);
-    $('clearBtn').addEventListener('click',()=>clearForm());
-    $('saveOrderBtn').addEventListener('click',saveOrderNow);
-    $('orderForm').addEventListener('submit',e=>{e.preventDefault(); saveOrderNow();});
-    $('photoInput').addEventListener('change',async e=>{
-      const file=e.target.files[0]; if(!file)return;
+    if(typeof nav === 'function') $o('nav').innerHTML = nav({key:'orders', title:'Order Board', subtitle:'Digital workflow for paper order tickets'});
+    else $o('nav').innerHTML = '<header class="topbar"><div class="brand"><div><h1>Order Board</h1><p>Digital workflow for paper order tickets</p></div></div></header>';
+    if(typeof footer === 'function') $o('footer').innerHTML = footer();
+    $o('orderDate').value = todayO();
+    $o('newOrderBtn').addEventListener('click',()=>openOrderForm(null));
+    $o('refreshBtn').addEventListener('click',renderBoard);
+    $o('closeFormBtn').addEventListener('click',closeOrderForm);
+    $o('parseBtn').addEventListener('click',parseQuickText);
+    $o('clearBtn').addEventListener('click',()=>clearForm());
+    $o('saveOrderBtn').addEventListener('click',saveOrderNow);
+    $o('orderForm').addEventListener('submit',e=>{e.preventDefault(); saveOrderNow();});
+    $o('customerName').addEventListener('input',e=>loadCustomerNames(e.target.value));
+    $o('photoInput').addEventListener('change',async e=>{
+      const file=e.target.files[0];
+      if(!file)return;
       const r=new FileReader();
-      r.onload=()=>{currentPhotoData=r.result;$('photoPreviewWrap').innerHTML=`<img class="photo-preview" src="${currentPhotoData}"><p class="hint"><b>Photo attached.</b> The photo is kept as a reference.</p>`;};
+      r.onload=()=>{currentPhotoData=r.result;$o('photoPreviewWrap').innerHTML=`<img class="photo-preview" src="${currentPhotoData}"><p class="hint"><b>Photo attached.</b> The photo is kept as a reference.</p>`;};
       r.readAsDataURL(file);
     });
-    setStatusMessage('Orders page loaded.');
+    setStatus('Orders page loaded. Customer name lookup is active.');
+    await loadCustomerNames('');
     await renderBoard();
   }catch(err){
     alert('Orders init failed: '+(err.message||err));
