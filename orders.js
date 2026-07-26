@@ -11,7 +11,7 @@ function parseLooseDate(value){
   if(!raw) return '';
   if(/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
   const m = raw.match(/^(\d{1,2})[\/\-](\d{1,2})(?:[\/\-](\d{2,4}))?$/);
-  if(!m) return '';
+  if(!m) return raw;
   const currentYear = new Date().getFullYear();
   let year = m[3] ? Number(m[3]) : currentYear;
   if(year < 100) year += 2000;
@@ -124,62 +124,98 @@ function clearForm(resetDate=true){
   $('status').value = 'New Orders';
 }
 
-async function saveOrder(e){
-  e.preventDefault();
-  const order = {
+function buildOrderPayload(){
+  return {
     id: $('orderId').value || undefined,
-    order_date: $('orderDate').value || todayISO(),
-    pickup_date: $('pickupDate').value || null,
+    order_date: parseLooseDate($('orderDate').value) || todayISO(),
+    pickup_date: parseLooseDate($('pickupDate').value) || null,
     customer_name: $('customerName').value.trim(),
-    media_source: $('mediaSource').value,
-    details: $('details').value,
+    media_source: $('mediaSource').value || '',
+    details: $('details').value || $('quickText').value || '',
     total_amount: Number($('totalAmount').value) || 0,
-    payment_type: $('paymentType').value,
+    payment_type: $('paymentType').value || '',
     status: $('status').value || 'New Orders',
     photo_data: currentPhotoData || null
   };
+}
 
-  if(!order.customer_name) return alert('Customer name is required.');
-  await upsertOrder(order);
-  closeOrderForm();
-  await renderBoard();
+async function saveOrder(e){
+  e.preventDefault();
+  const saveBtn = e.submitter || document.querySelector('#orderForm button[type="submit"]');
+
+  try{
+    if(saveBtn){
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving...';
+    }
+
+    const order = buildOrderPayload();
+    if(!order.customer_name){
+      alert('Customer name is required.');
+      return;
+    }
+
+    console.log('Saving order:', order);
+    const saved = await upsertOrder(order);
+    console.log('Saved order:', saved);
+
+    closeOrderForm();
+    await renderBoard();
+    alert('Order saved successfully.');
+  }catch(err){
+    console.error('Save Order failed:', err);
+    alert('Save Order failed: ' + (err.message || err));
+  }finally{
+    if(saveBtn){
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save Order';
+    }
+  }
 }
 
 async function updateOrderStatus(id, status){
-  const order = allOrders.find(o => Number(o.id) === Number(id));
-  if(!order) return;
-  await upsertOrder({...order, status});
-  await renderBoard();
+  try{
+    const order = allOrders.find(o => Number(o.id) === Number(id));
+    if(!order) return;
+    await upsertOrder({...order, status});
+    await renderBoard();
+  }catch(err){
+    alert('Could not move order: ' + (err.message || err));
+  }
 }
 
 async function postOrder(id){
-  const order = allOrders.find(o => Number(o.id) === Number(id));
-  if(!order) return;
-  if(order.posted_transaction_id){
-    alert('This order has already been posted to Finance.');
-    return;
-  }
-  if(!order.total_amount){
-    alert('Total amount is required before posting to Finance.');
-    return;
-  }
-  if(!order.payment_type){
-    alert('Payment type is recommended before posting to Finance.');
-    return;
-  }
-  if(confirm('Post this order to Finance as Income / Orders?')){
-    await postOrderToFinance(order);
-    await renderBoard();
-    alert('Posted to Finance.');
+  try{
+    const order = allOrders.find(o => Number(o.id) === Number(id));
+    if(!order) return;
+    if(order.posted_transaction_id){
+      alert('This order has already been posted to Finance.');
+      return;
+    }
+    if(!order.total_amount){
+      alert('Total amount is required before posting to Finance.');
+      return;
+    }
+    if(confirm('Post this order to Finance as Income / Orders?')){
+      await postOrderToFinance(order);
+      await renderBoard();
+      alert('Posted to Finance.');
+    }
+  }catch(err){
+    alert('Post to Finance failed: ' + (err.message || err));
   }
 }
 
 async function cancelOrder(id){
-  const order = allOrders.find(o => Number(o.id) === Number(id));
-  if(!order) return;
-  if(confirm('Move this order to Cancelled?')){
-    await upsertOrder({...order, status:'Cancelled'});
-    await renderBoard();
+  try{
+    const order = allOrders.find(o => Number(o.id) === Number(id));
+    if(!order) return;
+    if(confirm('Move this order to Cancelled?')){
+      await upsertOrder({...order, status:'Cancelled'});
+      await renderBoard();
+    }
+  }catch(err){
+    alert('Cancel failed: ' + (err.message || err));
   }
 }
 
@@ -193,6 +229,7 @@ function orderCard(order){
         <span>${money(order.total_amount)}</span>
       </div>
       <div class="board-meta">
+        <div><b>Order:</b> ${order.order_date || '-'}</div>
         <div><b>Pickup:</b> ${order.pickup_date || '-'}</div>
         <div><b>Source:</b> ${escapeHtml(order.media_source || '-')}</div>
         <div><b>Payment:</b> ${escapeHtml(order.payment_type || '-')}</div>
@@ -234,20 +271,25 @@ function bindDragDrop(){
 }
 
 async function renderBoard(){
-  allOrders = await loadOrders('all');
+  try{
+    allOrders = await loadOrders('all');
 
-  BOARD_STATUSES.forEach(status => {
-    const list = allOrders.filter(o => (o.status || 'New Orders') === status);
-    const id = statusId(status);
-    const listEl = $(`list${id}`);
-    const countEl = $(`count${id}`);
-    if(listEl) listEl.innerHTML = list.map(orderCard).join('') || '<p class="empty-column">Drop orders here.</p>';
-    if(countEl) countEl.textContent = list.length;
-  });
+    BOARD_STATUSES.forEach(status => {
+      const list = allOrders.filter(o => (o.status || 'New Orders') === status);
+      const id = statusId(status);
+      const listEl = $(`list${id}`);
+      const countEl = $(`count${id}`);
+      if(listEl) listEl.innerHTML = list.map(orderCard).join('') || '<p class="empty-column">Drop orders here.</p>';
+      if(countEl) countEl.textContent = list.length;
+    });
 
-  const cancelled = allOrders.filter(o => o.status === 'Cancelled');
-  $('cancelledOrders').innerHTML = cancelled.map(orderCard).join('') || '<p>No cancelled orders.</p>';
-  bindDragDrop();
+    const cancelled = allOrders.filter(o => o.status === 'Cancelled');
+    if($('cancelledOrders')) $('cancelledOrders').innerHTML = cancelled.map(orderCard).join('') || '<p>No cancelled orders.</p>';
+    bindDragDrop();
+  }catch(err){
+    console.error('Board load failed:', err);
+    alert('Board load failed: ' + (err.message || err));
+  }
 }
 
 window.editOrder = id => {
@@ -276,4 +318,4 @@ async function init(){
   await renderBoard();
 }
 
-init().catch(e => alert(e.message));
+init().catch(e => alert('Orders page failed to load: ' + (e.message || e)));
