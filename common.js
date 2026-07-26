@@ -49,6 +49,18 @@ function includedTax(amount) {
   return amount - amount / (1 + TAX_RATE);
 }
 
+function onlyMoneyRows(rows, year, month) {
+  return rows.filter(r => {
+    if (!r.transaction_date) return false;
+    if (year && year !== "all" && !String(r.transaction_date).startsWith(String(year) + "-")) return false;
+    if (month && month !== "all") {
+      const mm = String(month).padStart(2, "0");
+      if (String(r.transaction_date).slice(5, 7) !== mm) return false;
+    }
+    return true;
+  });
+}
+
 function buildMonthRows(rows) {
   const monthRows = [];
 
@@ -116,7 +128,8 @@ async function getTransactionsRaw(year = "all", month = "all") {
     .from("transactions")
     .select("*")
     .order("transaction_date", { ascending: false })
-    .order("id", { ascending: false });
+    .order("id", { ascending: false })
+    .limit(5000);
 
   if (year && year !== "all") {
     query = query
@@ -124,7 +137,7 @@ async function getTransactionsRaw(year = "all", month = "all") {
       .lte("transaction_date", `${year}-12-31`);
   }
 
-  if (month && month !== "all") {
+  if (month && month !== "all" && year && year !== "all") {
     const mm = String(month).padStart(2, "0");
     const lastDay = new Date(Number(year), Number(month), 0).getDate();
     query = query
@@ -140,7 +153,8 @@ async function getTransactionsRaw(year = "all", month = "all") {
 async function getYears() {
   const { data, error } = await window.saltySupabase
     .from("transactions")
-    .select("transaction_date");
+    .select("transaction_date")
+    .limit(5000);
 
   if (error) throw new Error(error.message);
 
@@ -157,7 +171,8 @@ async function getCustomers(term = "") {
   const { data, error } = await window.saltySupabase
     .from("transactions")
     .select("customer_name, transaction_date, entry_type")
-    .not("customer_name", "is", null);
+    .not("customer_name", "is", null)
+    .limit(5000);
 
   if (error) throw new Error(error.message);
 
@@ -212,7 +227,8 @@ async function getCustomerReport(name) {
     .select("*")
     .eq("customer_name", name)
     .order("transaction_date", { ascending: false })
-    .order("id", { ascending: false });
+    .order("id", { ascending: false })
+    .limit(5000);
 
   if (error) throw new Error(error.message);
 
@@ -222,6 +238,8 @@ async function getCustomerReport(name) {
     r.entry_type === "Income" || r.entry_type === "Donation"
   );
 
+  const dates = tx.map(r => r.date).filter(Boolean).sort();
+
   const summary = {
     order_count: incomeRows.length,
     total_income: tx
@@ -230,8 +248,8 @@ async function getCustomerReport(name) {
     total_donations: tx
       .filter(r => r.entry_type === "Donation")
       .reduce((t, r) => t + Number(r.amount || 0), 0),
-    first_date: tx.length ? tx.map(r => r.date).sort()[0] : "",
-    last_date: tx.length ? tx.map(r => r.date).sort().reverse()[0] : ""
+    first_date: dates[0] || "",
+    last_date: dates[dates.length - 1] || ""
   };
 
   return {
@@ -241,6 +259,10 @@ async function getCustomerReport(name) {
 }
 
 async function api(url, opt = {}) {
+  if (!window.saltySupabase) {
+    throw new Error("Supabase is not loaded. Check index.html script order and supabase.js.");
+  }
+
   const method = (opt.method || "GET").toUpperCase();
   const parsed = new URL(url, window.location.origin);
   const path = parsed.pathname;
