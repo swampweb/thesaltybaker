@@ -7,7 +7,41 @@ async function fillYears(){const years=await loadYears();const cur=String(new Da
 async function fillCustomers(term=''){const rows=await sbFetch('/transactions?select=customer_name,transaction_date,entry_type&limit=5000');const map=new Map();rows.forEach(r=>{const n=String(r.customer_name||'').trim();if(!n)return;if(term && !n.toLowerCase().includes(term.toLowerCase()))return;if(!map.has(n))map.set(n,{name:n,orders:0,last_date:''});const item=map.get(n);if(r.entry_type==='Income'||r.entry_type==='Donation')item.orders++;if(!item.last_date||r.transaction_date>item.last_date)item.last_date=r.transaction_date;});allCustomers=[...map.values()].sort((a,b)=>a.name.localeCompare(b.name));const html=allCustomers.map(c=>`<option value="${escapeHtml(c.name)}">${c.orders} row(s), last ${c.last_date}</option>`).join('');$('customerList').innerHTML=html;$('customerReportList').innerHTML=html;}
 function bestCustomerName(n){const low=String(n||'').trim().toLowerCase();const c=allCustomers.find(x=>x.name.toLowerCase()===low);return c?c.name:String(n||'').trim();}
 function updateLastEntryBubble(type){const selected=type||$('entryType').value;const rows=tx.filter(r=>r.entry_type===selected).sort((a,b)=>String(b.transaction_date).localeCompare(String(a.transaction_date))||b.id-a.id);if(!rows.length){$('lastEntryDetails').textContent=`No entry found for ${selected}.`;return;}const r=rows[0];$('lastEntryDetails').innerHTML=`<span><b>Date:</b> ${r.transaction_date}</span> <span><b>Customer:</b> ${escapeHtml(r.customer_name||'')}</span> <span><b>Payment:</b> ${escapeHtml(r.payment_type||'')}</span> <span><b>Amount:</b> ${money(r.amount)}</span>`;}
-async function refresh(){const year=$('year').value, month=$('month').value;const allYear=await loadTransactions(year);const monthRows=calculateMonthly(allYear);const totals=totalsFromMonthly(monthRows);$('totalIncome').textContent=money(totals.income+totals.donations);$('totalExpenses').textContent=money(totals.expenses);$('totalProfit').textContent=money(totals.net_profit);$('totalTax').textContent=money(totals.tax_due);$('summaryTable').querySelector('tbody').innerHTML=monthRows.map(x=>`<tr><td>${months[x.month-1]}</td><td>${money(x.income)}</td><td>${money(x.cash_income)}</td><td>${money(x.donations)}</td><td>${money(x.expenses)}</td><td>${money(x.net_profit)}</td><td>${money(x.noncash_gross)}</td><td class="filing-amount">${money(x.taxable_sales)}</td><td>${money(x.tax_due)}</td></tr>`).join('');$('footIncome').textContent=money(totals.income);$('footCash').textContent=money(totals.cash_income);$('footDonations').textContent=money(totals.donations);$('footExpenses').textContent=money(totals.expenses);$('footProfit').textContent=money(totals.net_profit);$('footNonCashGross').textContent=money(totals.noncash_gross);$('footFilingAmount').textContent=money(totals.taxable_sales);$('footTaxDue').textContent=money(totals.tax_due);tx=allYear.filter(r=>month==='all'||Number(String(r.transaction_date).slice(5,7))===Number(month));renderTx();updateLastEntryBubble($('entryType').value);}
+
+async function renderOrdersMonthSummary(){
+  const target = $('ordersMonthSummary');
+  if(!target) return;
+
+  try{
+    const orders = await loadOrders('all');
+    const monthCounts = new Map();
+
+    (orders || []).forEach(o => {
+      const status = String(o.status || 'New Orders');
+      if(status === 'Posted to Finance' || status === 'Cancelled') return;
+      if(!o.pickup_date) return;
+
+      const monthNum = Number(String(o.pickup_date).slice(5,7));
+      if(!monthNum) return;
+      const label = months[monthNum - 1];
+      monthCounts.set(label, (monthCounts.get(label) || 0) + 1);
+    });
+
+    const cards = [...monthCounts.entries()].map(([month, count]) => `
+      <div class="month-summary-card">
+        <span>${month}</span>
+        <strong>${count}</strong>
+        <small>not posted</small>
+      </div>
+    `).join('');
+
+    target.innerHTML = cards || '<div class="month-summary-empty">No unposted orders with pickup dates.</div>';
+  }catch(err){
+    target.innerHTML = `<div class="month-summary-empty error">Order summary unavailable: ${escapeHtml(err.message || err)}</div>`;
+  }
+}
+
+async function refresh(){const year=$('year').value, month=$('month').value;const allYear=await loadTransactions(year);const monthRows=calculateMonthly(allYear);const totals=totalsFromMonthly(monthRows);$('totalIncome').textContent=money(totals.income+totals.donations);$('totalExpenses').textContent=money(totals.expenses);$('totalProfit').textContent=money(totals.net_profit);$('totalTax').textContent=money(totals.tax_due);$('summaryTable').querySelector('tbody').innerHTML=monthRows.map(x=>`<tr><td>${months[x.month-1]}</td><td>${money(x.income)}</td><td>${money(x.cash_income)}</td><td>${money(x.donations)}</td><td>${money(x.expenses)}</td><td>${money(x.net_profit)}</td><td>${money(x.noncash_gross)}</td><td class="filing-amount">${money(x.taxable_sales)}</td><td>${money(x.tax_due)}</td></tr>`).join('');$('footIncome').textContent=money(totals.income);$('footCash').textContent=money(totals.cash_income);$('footDonations').textContent=money(totals.donations);$('footExpenses').textContent=money(totals.expenses);$('footProfit').textContent=money(totals.net_profit);$('footNonCashGross').textContent=money(totals.noncash_gross);$('footFilingAmount').textContent=money(totals.taxable_sales);$('footTaxDue').textContent=money(totals.tax_due);tx=allYear.filter(r=>month==='all'||Number(String(r.transaction_date).slice(5,7))===Number(month));renderTx();await renderOrdersMonthSummary();updateLastEntryBubble($('entryType').value);}
 function renderTx(){const q=String($('search').value||'').toLowerCase();const rows=tx.filter(r=>JSON.stringify(r).toLowerCase().includes(q));$('monthlyTitle').textContent=`Monthly Inputs - Orders: ${rows.filter(r=>r.entry_type==='Income'&&String(r.account).toLowerCase()==='orders').length}`;$('txTable').querySelector('tbody').innerHTML=rows.map(r=>`<tr><td>${r.transaction_date}</td><td>${r.entry_type}</td><td>${r.account}</td><td>${escapeHtml(r.customer_name||'')}</td><td>${escapeHtml(r.payment_type||'')}</td><td>${money(r.amount)}</td><td>${escapeHtml(r.notes||'')}</td><td><button onclick="editTx(${r.id})">Edit</button> <button class="danger" onclick="delTx(${r.id})">Delete</button></td></tr>`).join('');}
 window.editTx=id=>{const r=tx.find(x=>x.id===id);if(!r)return;$('entryId').value=r.id;$('date').value=r.transaction_date;setType(r.entry_type,r.account);$('name').value=r.customer_name||'';$('paymentType').value=r.payment_type||'';$('amount').value=r.amount;$('notes').value=r.notes||'';scrollTo({top:0,behavior:'smooth'});};
 window.delTx=async id=>{if(confirm('Delete this entry?')){await deleteTransaction(id);await refresh();}};

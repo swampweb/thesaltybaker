@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.10 no load status loaded');
+console.log('orders.js v4.1.11 order numbers payment prompt loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -149,8 +149,6 @@ function openOrderForm(order){
     $o('totalAmount').value = order.total_amount || '';
     $o('paymentType').value = order.payment_type || '';
     $o('status').value = order.status || 'New Orders';
-    currentPhotoData = order.photo_data || '';
-    $o('photoPreviewWrap').innerHTML = currentPhotoData ? `<img class="photo-preview" src="${currentPhotoData}">` : '';
   }
   clearStatus();
   scrollTo({top:0,behavior:'smooth'});
@@ -162,8 +160,6 @@ function clearForm(resetDate=true){
   $o('orderForm').reset();
   $o('orderId').value = '';
   if(resetDate) $o('orderDate').value = todayO();
-  currentPhotoData = '';
-  $o('photoPreviewWrap').innerHTML = '';
   $o('status').value = 'New Orders';
 }
 
@@ -173,7 +169,7 @@ function buildPayload(){
     pickup_date: $o('pickupDate').value || null,
     customer_name: $o('customerName').value.trim(),
     media_source: $o('mediaSource').value || '',
-    details: $o('details').value || $o('quickText').value || '',
+    details: $o('details').value || '',
     total_amount: Number($o('totalAmount').value) || 0,
     payment_type: $o('paymentType').value || '',
     status: $o('status').value || 'New Orders',
@@ -223,9 +219,9 @@ function orderCard(order){
   const posted = !!order.posted_transaction_id || order.status === 'Posted to Finance';
   const photo = order.photo_data ? `<img class="board-photo" src="${order.photo_data}" alt="Order photo reference">` : '';
   return `<article class="board-card" draggable="true" data-id="${order.id}">
-    <div class="board-card-top"><strong>${escapeO(order.customer_name)}</strong><span>${moneyO(order.total_amount)}</span></div>
+    <div class="order-number">Order #${order.id}</div><div class="board-card-top"><strong>${escapeO(order.customer_name)}</strong><span>${moneyO(order.total_amount)}</span></div>
     <div class="board-meta"><div><b>Order:</b> ${order.order_date || '-'}</div><div><b>Pickup:</b> ${order.pickup_date || '-'}</div><div><b>Source:</b> ${escapeO(order.media_source || '-')}</div><div><b>Payment:</b> ${escapeO(order.payment_type || '-')}</div></div>
-    ${order.details ? `<p>${escapeO(order.details).slice(0,180)}</p>` : ''}${photo}
+    ${order.details ? `<p>${escapeO(order.details).slice(0,180)}</p>` : ''}
     <div class="board-actions"><button type="button" onclick="editOrder(${order.id})">Edit</button>${posted ? `<span class="posted-label">Posted</span><button type="button" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary" onclick="postOrder(${order.id})">Post</button>`}<button type="button" class="danger" onclick="deleteOrder(${order.id})">Delete</button></div>
   </article>`;
 }
@@ -245,6 +241,11 @@ function bindDragDrop(){
 async function renderBoard(){
   try{
     allOrders = await loadOrdersSelf();
+    allOrders.sort((a,b)=>{
+      const ap = a.pickup_date || '9999-12-31';
+      const bp = b.pickup_date || '9999-12-31';
+      return ap.localeCompare(bp) || String(a.order_date||'9999-12-31').localeCompare(String(b.order_date||'9999-12-31')) || Number(a.id||0)-Number(b.id||0);
+    });
     BOARD_STATUSES.forEach(status=>{
       const list = allOrders.filter(o=>(o.status||'New Orders')===status);
       const id=statusId(status);
@@ -276,19 +277,28 @@ async function postOrder(id){
     if(!o)return;
     if(o.posted_transaction_id){ setStatus('This order is already posted.', true); return; }
     if(!o.total_amount){ setStatus('Total amount is required before posting.', true); return; }
-    if(confirm('Post this order to Finance as Income / Orders?')){
+
+    let paymentType = o.payment_type || '';
+    if(!paymentType){
+      const choice = prompt('Choose payment type before posting:\n\nApple, Cash, Cash App, Paypal, Square, Venmo, Zelle, Other', 'Venmo');
+      if(choice === null) return;
+      paymentType = String(choice || '').trim();
+      if(!paymentType){ setStatus('Payment type is required before posting.', true); return; }
+    }
+
+    if(confirm(`Post Order #${o.id} to Finance as Income / Orders?`)){
       const txPayload = {
         transaction_date: o.order_date || todayO(),
         entry_type: 'Income',
         account: 'Orders',
         customer_name: o.customer_name || '',
-        payment_type: o.payment_type || '',
+        payment_type: paymentType,
         amount: Number(o.total_amount)||0,
-        notes: `Order Board | Pickup: ${o.pickup_date||''} | Source: ${o.media_source||''} | Details: ${o.details||''}`
+        notes: `Order #${o.id} | Order Board | Pickup: ${o.pickup_date||''} | Source: ${o.media_source||''} | Details: ${o.details||''}`
       };
       const tx = await rest('/transactions', {method:'POST', headers:{Prefer:'return=representation'}, body:JSON.stringify(txPayload)});
-      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status:'Posted to Finance', posted_transaction_id:tx?.[0]?.id || null})});
-      setStatus('Posted to Finance.');
+      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status:'Posted to Finance', payment_type:paymentType, posted_transaction_id:tx?.[0]?.id || null})});
+      setStatus(`Order #${o.id} posted to Finance as Income / Orders.`);
       await renderBoard();
     }
   }catch(err){ setStatus('Post failed: '+escapeO(err.message||err), true); }
@@ -350,18 +360,10 @@ async function init(){
     $o('newOrderBtn').addEventListener('click',()=>openOrderForm(null));
     $o('refreshBtn').addEventListener('click',renderBoard);
     $o('closeFormBtn').addEventListener('click',closeOrderForm);
-    $o('parseBtn').addEventListener('click',parseQuickText);
     $o('clearBtn').addEventListener('click',()=>clearForm());
     $o('saveOrderBtn').addEventListener('click',saveOrderNow);
     $o('orderForm').addEventListener('submit',e=>{e.preventDefault(); saveOrderNow();});
     $o('customerName').addEventListener('input',e=>loadCustomerNames(e.target.value));
-    $o('photoInput').addEventListener('change',async e=>{
-      const file=e.target.files[0];
-      if(!file)return;
-      const r=new FileReader();
-      r.onload=()=>{currentPhotoData=r.result;$o('photoPreviewWrap').innerHTML=`<img class="photo-preview" src="${currentPhotoData}"><p class="hint"><b>Photo attached.</b> The photo is kept as a reference.</p>`;};
-      r.readAsDataURL(file);
-    });
     clearStatus();
     await loadCustomerNames('');
     await renderBoard();

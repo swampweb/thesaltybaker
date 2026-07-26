@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Order Board</title>
-  <link rel="stylesheet" href="styles.css?v=4104">
+  <link rel="stylesheet" href="styles.css?v=4111">
 </head>
 <body>
 <div id="nav"></div>
@@ -13,14 +13,14 @@
     <div class="panel-head">
       <div>
         <h2>Digital Order Board</h2>
-        <p class="hint">This replaces the clothesline board while keeping the same order-ticket workflow: new order, in progress, ready, picked up, then posted to finance.</p>
+        <p class="hint">Create the order card, write the Order # on the paper ticket, then post to Finance when payment is known.</p>
       </div>
       <div class="filters">
         <button class="primary" id="newOrderBtn" type="button">New Order</button>
         <button id="refreshBtn" type="button">Refresh</button>
       </div>
     </div>
-    <p class="notice"><b>Best flow:</b> Create the order card when the order comes in. Move the card across the board as work progresses. When payment is confirmed, click <b>Post to Finance</b> once to create the income transaction automatically.</p>
+    <p class="notice"><b>Best flow:</b> New Order → In Progress → Ready → Picked Up → Post. Posting creates the Finance transaction as <b>Income / Orders</b>.</p>
     <p id="saveStatus" class="notice" style="display:none"></p>
   </section>
 
@@ -58,20 +58,6 @@
         </select>
       </label>
 
-      <label>Payment
-        <select id="paymentType">
-          <option></option>
-          <option>Apple</option>
-          <option>Cash</option>
-          <option>Cash App</option>
-          <option>Paypal</option>
-          <option>Square</option>
-          <option>Venmo</option>
-          <option>Zelle</option>
-          <option>Other</option>
-        </select>
-      </label>
-
       <label>Total Amount
         <input id="totalAmount" type="number" step="0.01">
       </label>
@@ -87,25 +73,18 @@
         </select>
       </label>
 
-      <label>Order Photo
-        <input id="photoInput" type="file" accept="image/*">
-      </label>
-
-      <label class="full">Quick Text Helper
-        <textarea id="quickText" placeholder="Optional quick fill. Example: Name: Kurstan Polkey, Date: 6/28, P/U Date: 7/31, Media Source: Messenger, Payment: Venmo, Details: 2 dozen mermaid theme, Total: 72"></textarea>
-      </label>
-
-      <div class="full form-actions">
-        <button type="button" id="parseBtn">Fill From Quick Text</button>
-        <button class="primary" id="saveOrderBtn" type="button">Save Order</button>
-        <button type="button" id="clearBtn">Clear</button>
+      <div class="finance-posting-note full">
+        <b>When posted:</b> Type = <b>Income</b>, Account = <b>Orders</b>. If payment is blank, the Post button will ask for payment method.
       </div>
 
       <label class="full">Details
         <textarea id="details"></textarea>
       </label>
 
-      <div class="full" id="photoPreviewWrap"></div>
+      <div class="full form-actions">
+        <button class="primary" id="saveOrderBtn" type="button">Save Order</button>
+        <button type="button" id="clearBtn">Clear</button>
+      </div>
     </form>
   </section>
 
@@ -123,8 +102,8 @@
   </section>
 </main>
 <div id="footer"></div>
-<script src="config.js?v=4104"></script>
-<script src="common.js?v=4104"></script>
-<script src="orders.js?v=4104"></script>
+<script src="config.js?v=4111"></script>
+<script src="common.js?v=4111"></script>
+<script src="orders.js?v=4111"></script>
 </body>
 </html>
