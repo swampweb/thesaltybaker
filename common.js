@@ -3,18 +3,32 @@ const money = n => (Number(n)||0).toLocaleString(undefined,{style:'currency',cur
 const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 const todayISO = () => new Date().toISOString().slice(0,10);
 
+// Fallback config in case config.js is cached/missing.
+const SB_URL = (typeof SUPABASE_URL !== 'undefined') ? SUPABASE_URL : 'https://fprbzavehflzqcmxvbxx.supabase.co';
+const SB_KEY = (typeof SUPABASE_ANON_KEY !== 'undefined') ? SUPABASE_ANON_KEY : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcmJ6YXZlaGZsenFjbXh2Ynh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MjMxNzEsImV4cCI6MjA5OTk5OTE3MX0.8_D_7kx9f2as46N7ZrNhGZen25e8TGFd2ue5p1TgTvg';
+const SB_REST = `${SB_URL}/rest/v1`;
+const APP_VER = (typeof APP_VERSION !== 'undefined') ? APP_VERSION : '4.1.03';
+const TAX_RATE_SAFE = (typeof SALES_TAX_RATE !== 'undefined') ? SALES_TAX_RATE : 0.10;
+
 function apiHeaders(extra={}){
   return {
-    apikey: SUPABASE_ANON_KEY,
-    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    apikey: SB_KEY,
+    Authorization: `Bearer ${SB_KEY}`,
     'Content-Type': 'application/json',
     ...extra
   };
 }
 
 async function sbFetch(path, options={}){
-  const url = `${SUPABASE_REST_URL}${path}`;
-  const res = await fetch(url, {headers: apiHeaders(options.headers||{}), ...options});
+  const extraHeaders = options.headers || {};
+  const cleanOptions = {...options};
+  delete cleanOptions.headers;
+
+  const res = await fetch(`${SB_REST}${path}`, {
+    ...cleanOptions,
+    headers: apiHeaders(extraHeaders)
+  });
+
   const text = await res.text();
   let data = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -29,18 +43,9 @@ function escapeHtml(value){
   return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[ch]));
 }
 
-function getYearRange(year){
-  return {start:`${year}-01-01`, end:`${year}-12-31`};
-}
-
-function includedTax(amount){
-  amount = Number(amount)||0;
-  return amount - amount/(1+SALES_TAX_RATE);
-}
-function filingAmount(amount){
-  amount = Number(amount)||0;
-  return amount/(1+SALES_TAX_RATE);
-}
+function getYearRange(year){ return {start:`${year}-01-01`, end:`${year}-12-31`}; }
+function includedTax(amount){ amount=Number(amount)||0; return amount - amount/(1+TAX_RATE_SAFE); }
+function filingAmount(amount){ amount=Number(amount)||0; return amount/(1+TAX_RATE_SAFE); }
 
 async function loadTransactions(year='all'){
   let path = '/transactions?select=*&order=transaction_date.desc,id.desc&limit=5000';
@@ -87,13 +92,12 @@ async function updateTransaction(id,row){
   const data = await sbFetch(`/transactions?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify(row)});
   return data?.[0];
 }
-async function deleteTransaction(id){
-  await sbFetch(`/transactions?id=eq.${encodeURIComponent(id)}`, {method:'DELETE'});
-}
+async function deleteTransaction(id){ await sbFetch(`/transactions?id=eq.${encodeURIComponent(id)}`, {method:'DELETE'}); }
 
 async function upsertOrder(order){
   const id = order.id;
-  const body = {...order}; delete body.id;
+  const body = {...order};
+  delete body.id;
   if(id){
     const data = await sbFetch(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify(body)});
     return data?.[0];
@@ -114,7 +118,7 @@ async function postOrderToFinance(order){
     customer_name: order.customer_name || '',
     payment_type: order.payment_type || '',
     amount: Number(order.total_amount)||0,
-    notes: `Order Capture | Pickup: ${order.pickup_date||''} | Source: ${order.media_source||''} | Details: ${order.details||''}`
+    notes: `Order Board | Pickup: ${order.pickup_date||''} | Source: ${order.media_source||''} | Details: ${order.details||''}`
   });
   await upsertOrder({...order, status:'Posted to Finance', posted_transaction_id: tx.id});
   return tx;
@@ -123,4 +127,4 @@ async function postOrderToFinance(order){
 function nav(active){
   return `<header class="topbar"><div class="brand"><img src="logo.png" onerror="this.style.display='none'"><div><h1>${active.title}</h1><p>${active.subtitle}</p></div></div><nav><a ${active.key==='dashboard'?'class="active"':''} href="index.html">Dashboard</a><a ${active.key==='orders'?'class="active"':''} href="orders.html">Orders</a><a ${active.key==='reports'?'class="active"':''} href="reports.html">Reports</a><a ${active.key==='tax'?'class="active"':''} href="tax.html">Tax</a><a ${active.key==='admin'?'class="active"':''} href="admin.html">Admin</a><button class="exit-btn" onclick="alert('Close this browser tab when finished.')">Exit</button></nav></header>`;
 }
-function footer(){ return `<footer class="site-footer">Created by CajunVeteran 2026 | Version ${APP_VERSION}</footer>`; }
+function footer(){ return `<footer class="site-footer">Created by CajunVeteran 2026 | Version ${APP_VER}</footer>`; }
