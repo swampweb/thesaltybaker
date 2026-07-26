@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Order Board</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=4102">
 </head>
 <body>
 <div id="nav"></div>
@@ -21,6 +21,7 @@
       </div>
     </div>
     <p class="notice"><b>Best flow:</b> Create the order card when the order comes in. Move the card across the board as work progresses. When payment is confirmed, click <b>Post to Finance</b> once to create the income transaction automatically.</p>
+    <p id="saveStatus" class="notice" style="display:none"></p>
   </section>
 
   <section id="orderFormPanel" class="panel order-form-panel" style="display:none">
@@ -28,7 +29,7 @@
       <h2 id="formTitle">New Order</h2>
       <button id="closeFormBtn" type="button">Close</button>
     </div>
-    <form id="orderForm" class="grid-4">
+    <form id="orderForm" class="grid-4" onsubmit="return false;">
       <input type="hidden" id="orderId">
       <label>Order Date
         <input id="orderDate" type="date">
@@ -37,7 +38,7 @@
         <input id="pickupDate" type="date">
       </label>
       <label>Customer Name
-        <input id="customerName" required>
+        <input id="customerName">
       </label>
       <label>Media Source
         <select id="mediaSource">
@@ -84,7 +85,7 @@
       </label>
       <div class="full form-actions">
         <button type="button" id="parseBtn">Fill From Quick Text</button>
-        <button class="primary" type="submit">Save Order</button>
+        <button class="primary" id="saveOrderBtn" type="button">Save Order</button>
         <button type="button" id="clearBtn">Clear</button>
       </div>
       <label class="full">Details
@@ -95,26 +96,11 @@
   </section>
 
   <section class="order-board" id="orderBoard">
-    <div class="board-column" data-status="New Orders">
-      <div class="board-column-head"><h3>New Orders</h3><span id="countNewOrders">0</span></div>
-      <div class="board-list" id="listNewOrders"></div>
-    </div>
-    <div class="board-column" data-status="In Progress">
-      <div class="board-column-head"><h3>In Progress</h3><span id="countInProgress">0</span></div>
-      <div class="board-list" id="listInProgress"></div>
-    </div>
-    <div class="board-column" data-status="Ready">
-      <div class="board-column-head"><h3>Ready</h3><span id="countReady">0</span></div>
-      <div class="board-list" id="listReady"></div>
-    </div>
-    <div class="board-column" data-status="Picked Up">
-      <div class="board-column-head"><h3>Picked Up</h3><span id="countPickedUp">0</span></div>
-      <div class="board-list" id="listPickedUp"></div>
-    </div>
-    <div class="board-column" data-status="Posted to Finance">
-      <div class="board-column-head"><h3>Posted</h3><span id="countPostedtoFinance">0</span></div>
-      <div class="board-list" id="listPostedtoFinance"></div>
-    </div>
+    <div class="board-column" data-status="New Orders"><div class="board-column-head"><h3>New Orders</h3><span id="countNewOrders">0</span></div><div class="board-list" id="listNewOrders"></div></div>
+    <div class="board-column" data-status="In Progress"><div class="board-column-head"><h3>In Progress</h3><span id="countInProgress">0</span></div><div class="board-list" id="listInProgress"></div></div>
+    <div class="board-column" data-status="Ready"><div class="board-column-head"><h3>Ready</h3><span id="countReady">0</span></div><div class="board-list" id="listReady"></div></div>
+    <div class="board-column" data-status="Picked Up"><div class="board-column-head"><h3>Picked Up</h3><span id="countPickedUp">0</span></div><div class="board-list" id="listPickedUp"></div></div>
+    <div class="board-column" data-status="Posted to Finance"><div class="board-column-head"><h3>Posted</h3><span id="countPostedtoFinance">0</span></div><div class="board-list" id="listPostedtoFinance"></div></div>
   </section>
 
   <section class="panel">
@@ -123,8 +109,8 @@
   </section>
 </main>
 <div id="footer"></div>
-<script src="config.js"></script>
-<script src="common.js"></script>
-<script src="orders.js"></script>
+<script src="config.js?v=4102"></script>
+<script src="common.js?v=4102"></script>
+<script src="orders.js?v=4102"></script>
 </body>
 </html>
