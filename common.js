@@ -98,7 +98,12 @@ async function updateTransaction(id,row){
   const data = await sbFetch(`/transactions?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify(row)});
   return data?.[0];
 }
-async function deleteTransaction(id){ await sbFetch(`/transactions?id=eq.${encodeURIComponent(id)}`, {method:'DELETE'}); }
+async function deleteTransaction(id){
+  // Keep Dashboard and Orders in sync:
+  // if a Finance transaction is deleted, delete any order linked to that posted_transaction_id too.
+  await sbFetch(`/orders?posted_transaction_id=eq.${encodeURIComponent(id)}`, {method:'DELETE'}).catch(() => null);
+  await sbFetch(`/transactions?id=eq.${encodeURIComponent(id)}`, {method:'DELETE'});
+}
 
 async function upsertOrder(order){
   const id = order.id;

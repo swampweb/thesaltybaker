@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.04 self-contained loaded');
+console.log('orders.js v4.1.07 sync delete/unpost loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -193,6 +193,11 @@ async function loadOrdersSelf(){
   return await rest('/orders?select=*&order=pickup_date.asc,order_date.asc,id.asc&limit=5000');
 }
 
+async function deleteLinkedTransaction(transactionId){
+  if(!transactionId) return;
+  await rest(`/transactions?id=eq.${encodeURIComponent(transactionId)}`, {method:'DELETE'});
+}
+
 function orderCard(order){
   const posted = !!order.posted_transaction_id || order.status === 'Posted to Finance';
   const photo = order.photo_data ? `<img class="board-photo" src="${order.photo_data}" alt="Order photo reference">` : '';
@@ -200,7 +205,7 @@ function orderCard(order){
     <div class="board-card-top"><strong>${escapeO(order.customer_name)}</strong><span>${moneyO(order.total_amount)}</span></div>
     <div class="board-meta"><div><b>Order:</b> ${order.order_date || '-'}</div><div><b>Pickup:</b> ${order.pickup_date || '-'}</div><div><b>Source:</b> ${escapeO(order.media_source || '-')}</div><div><b>Payment:</b> ${escapeO(order.payment_type || '-')}</div></div>
     ${order.details ? `<p>${escapeO(order.details).slice(0,180)}</p>` : ''}${photo}
-    <div class="board-actions"><button type="button" onclick="editOrder(${order.id})">Edit</button>${posted ? '<span class="posted-label">Posted</span>' : `<button type="button" class="primary" onclick="postOrder(${order.id})">Post</button>`}<button type="button" class="danger" onclick="cancelOrder(${order.id})">Cancel</button></div>
+    <div class="board-actions"><button type="button" onclick="editOrder(${order.id})">Edit</button>${posted ? `<span class="posted-label">Posted</span><button type="button" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary" onclick="postOrder(${order.id})">Post</button>`}<button type="button" class="danger" onclick="deleteOrder(${order.id})">Delete</button></div>
   </article>`;
 }
 
@@ -268,18 +273,52 @@ async function postOrder(id){
   }catch(err){ setStatus('Post failed: '+escapeO(err.message||err), true); }
 }
 
-async function cancelOrder(id){
+async function unpostOrder(id){
   try{
-    if(confirm('Move this order to Cancelled?')){
-      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status:'Cancelled'})});
+    const o = allOrders.find(x => Number(x.id) === Number(id));
+    if(!o) return;
+    if(!o.posted_transaction_id){
+      setStatus('This order is not linked to a Finance transaction.', true);
+      return;
+    }
+    if(confirm('Unpost this order? This will delete the linked Finance transaction and move the order back to Picked Up.')){
+      await deleteLinkedTransaction(o.posted_transaction_id);
+      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {
+        method:'PATCH',
+        headers:{Prefer:'return=representation'},
+        body:JSON.stringify({status:'Picked Up', posted_transaction_id:null})
+      });
+      setStatus('Order unposted and Finance transaction deleted.');
       await renderBoard();
     }
-  }catch(err){ setStatus('Cancel failed: '+escapeO(err.message||err), true); }
+  }catch(err){ setStatus('Unpost failed: '+escapeO(err.message||err), true); }
 }
 
+async function deleteOrder(id){
+  try{
+    const o = allOrders.find(x => Number(x.id) === Number(id));
+    if(!o) return;
+    const linked = o.posted_transaction_id ? ' This will also delete the linked Finance transaction.' : '';
+    if(confirm('Delete this order permanently?' + linked)){
+      if(o.posted_transaction_id){
+        await deleteLinkedTransaction(o.posted_transaction_id);
+      }
+      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'DELETE'});
+      setStatus('Order deleted. Linked Finance transaction was removed if one existed.');
+      await renderBoard();
+    }
+  }catch(err){ setStatus('Delete failed: '+escapeO(err.message||err), true); }
+}
+
+// Backward-compatible alias. Older UI text used Cancel; new UI uses Delete.
+async function cancelOrder(id){ return deleteOrder(id); }
+
+window.editOrder
 window.editOrder = id => { const o=allOrders.find(x=>Number(x.id)===Number(id)); if(o) openOrderForm(o); };
 window.postOrder = postOrder;
 window.cancelOrder = cancelOrder;
+window.deleteOrder = deleteOrder;
+window.unpostOrder = unpostOrder;
 
 async function init(){
   try{
