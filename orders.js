@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.16 clean cards payment dropdown loaded');
+console.log('orders.js v4.1.17 compact order card loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -252,17 +252,16 @@ function orderCard(order){
       <strong>${escapeO(order.customer_name)}</strong>
       <span>${moneyO(order.total_amount)}</span>
     </div>
-    <div class="date-row"><span><b>Order:</b> ${orderDate}</span><span><b>Pickup:</b> ${pickupDate}</span></div>
+    <div class="date-row"><span><b>Order:</b> ${orderDate}</span></div>
     <div class="board-meta clean-meta">
       <div><b>Source:</b> ${escapeO(order.media_source || '-')}</div>
-      <div><b>Payment:</b> ${paymentType ? escapeO(paymentType) : '-'}</div>
     </div>
     <div class="payment-status-row">${paymentButton}</div>
     ${order.details ? `<p class="order-details-text">${escapeO(order.details).slice(0,180)}</p>` : ''}
-    <div class="board-actions clean-actions">
-      <button type="button" class="soft-btn" onclick="editOrder(${order.id})">Edit</button>
-      ${posted ? `<span class="posted-label">Posted</span><button type="button" class="soft-btn" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary post-btn" onclick="postOrder(${order.id})">Post</button>`}
-      <button type="button" class="danger delete-btn" onclick="deleteOrder(${order.id})">Delete</button>
+    <div class="board-actions clean-actions compact-actions">
+      <button type="button" class="soft-btn small-action-btn" onclick="editOrder(${order.id})">Edit</button>
+      ${posted ? `<span class="posted-label small-posted-label">Posted</span><button type="button" class="soft-btn small-action-btn" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary post-btn small-action-btn" onclick="postOrder(${order.id})">Post</button>`}
+      <button type="button" class="danger delete-btn small-action-btn" onclick="deleteOrder(${order.id})">Delete</button>
     </div>
   </article>`;
 }

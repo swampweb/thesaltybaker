@@ -565,3 +565,47 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
     font-size:11px;
   }
 }
+
+
+/* =========================
+   ORDER CARD COMPACT CLEANUP v4.1.17
+   ========================= */
+.cleaner-order-card .date-row{
+  margin:4px 0 3px!important;
+}
+.cleaner-order-card .clean-meta{
+  margin:0 0 4px!important;
+}
+.compact-actions{
+  display:flex!important;
+  flex-direction:row!important;
+  align-items:center!important;
+  gap:7px!important;
+  flex-wrap:wrap!important;
+  margin-top:8px!important;
+}
+.small-action-btn{
+  border-radius:11px!important;
+  padding:7px 12px!important;
+  min-width:auto!important;
+  font-size:12px!important;
+  line-height:1.1!important;
+  font-weight:900!important;
+}
+.compact-actions .delete-btn{
+  grid-column:auto!important;
+  width:auto!important;
+}
+.compact-actions .post-btn{
+  justify-self:auto!important;
+}
+.small-posted-label{
+  padding:6px 10px!important;
+  font-size:12px!important;
+}
+.payment-status-row{
+  margin:8px 0 6px!important;
+}
+.order-details-text{
+  margin:8px 0 10px!important;
+}
