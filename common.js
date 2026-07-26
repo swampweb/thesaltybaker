@@ -1,386 +1,126 @@
-const money = n =>
-  (Number(n) || 0).toLocaleString(undefined, {
-    style: "currency",
-    currency: "USD"
-  });
-
-const months = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
-];
-
 const $ = id => document.getElementById(id);
+const money = n => (Number(n)||0).toLocaleString(undefined,{style:'currency',currency:'USD'});
+const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const todayISO = () => new Date().toISOString().slice(0,10);
 
-const TAX_RATE = 0.05;
-
-function exitApp() {
-  alert("The Salty Baker is running from GitHub Pages now. You can close this browser tab when finished.");
-}
-
-function normalizeTx(row) {
+function apiHeaders(extra={}){
   return {
-    id: row.id,
-    date: row.transaction_date,
-    entry_type: row.entry_type,
-    account: row.account,
-    name: row.customer_name || "",
-    payment_type: row.payment_type || "",
-    amount: Number(row.amount) || 0,
-    notes: row.notes || "",
-    created_at: row.created_at,
-    updated_at: row.updated_at
+    apikey: SUPABASE_ANON_KEY,
+    Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    ...extra
   };
 }
 
-function toDbTx(body) {
-  return {
-    transaction_date: body.date,
-    entry_type: body.entry_type,
-    account: body.account,
-    customer_name: body.name || "",
-    payment_type: body.payment_type || "",
-    amount: Number(body.amount) || 0,
-    notes: body.notes || ""
-  };
+async function sbFetch(path, options={}){
+  const url = `${SUPABASE_REST_URL}${path}`;
+  const res = await fetch(url, {headers: apiHeaders(options.headers||{}), ...options});
+  const text = await res.text();
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  if(!res.ok){
+    const msg = data?.message || data?.hint || text || `Supabase error ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
 }
 
-function includedTax(amount) {
-  amount = Number(amount) || 0;
-  return amount - amount / (1 + TAX_RATE);
+function escapeHtml(value){
+  return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[ch]));
 }
 
-function onlyMoneyRows(rows, year, month) {
-  return rows.filter(r => {
-    if (!r.transaction_date) return false;
-    if (year && year !== "all" && !String(r.transaction_date).startsWith(String(year) + "-")) return false;
-    if (month && month !== "all") {
-      const mm = String(month).padStart(2, "0");
-      if (String(r.transaction_date).slice(5, 7) !== mm) return false;
-    }
-    return true;
+function getYearRange(year){
+  return {start:`${year}-01-01`, end:`${year}-12-31`};
+}
+
+function includedTax(amount){
+  amount = Number(amount)||0;
+  return amount - amount/(1+SALES_TAX_RATE);
+}
+function filingAmount(amount){
+  amount = Number(amount)||0;
+  return amount/(1+SALES_TAX_RATE);
+}
+
+async function loadTransactions(year='all'){
+  let path = '/transactions?select=*&order=transaction_date.desc,id.desc&limit=5000';
+  if(year !== 'all'){
+    const r=getYearRange(year);
+    path += `&transaction_date=gte.${r.start}&transaction_date=lte.${r.end}`;
+  }
+  return await sbFetch(path);
+}
+
+async function loadYears(){
+  const rows = await sbFetch('/transactions?select=transaction_date&limit=5000');
+  const years = [...new Set(rows.map(r => String(r.transaction_date||'').slice(0,4)).filter(Boolean))].sort();
+  const current = String(new Date().getFullYear());
+  if(!years.includes(current)) years.push(current);
+  return [...new Set(years)].sort();
+}
+
+function calculateMonthly(rows){
+  const out=[];
+  for(let m=1;m<=12;m++){
+    const list=rows.filter(r => Number(String(r.transaction_date||'').slice(5,7))===m);
+    const income=list.filter(r=>r.entry_type==='Income').reduce((t,r)=>t+Number(r.amount||0),0);
+    const donations=list.filter(r=>r.entry_type==='Donation').reduce((t,r)=>t+Number(r.amount||0),0);
+    const expenses=list.filter(r=>r.entry_type==='Expense').reduce((t,r)=>t+Number(r.amount||0),0);
+    const cash=list.filter(r=>r.entry_type==='Income' && String(r.payment_type||'')==='Cash').reduce((t,r)=>t+Number(r.amount||0),0);
+    const noncash=list.filter(r=>r.entry_type==='Income' && String(r.payment_type||'')!=='Cash').reduce((t,r)=>t+Number(r.amount||0),0);
+    const filing=filingAmount(income);
+    out.push({month:m,income,donations,expenses,cash_income:cash,noncash_gross:noncash,taxable_sales:filing,tax_due:includedTax(income),net_profit:income+donations-expenses});
+  }
+  return out;
+}
+
+function totalsFromMonthly(monthRows){
+  const sum = f => monthRows.reduce((t,r)=>t+Number(r[f]||0),0);
+  return {income:sum('income'),donations:sum('donations'),expenses:sum('expenses'),cash_income:sum('cash_income'),noncash_gross:sum('noncash_gross'),taxable_sales:sum('taxable_sales'),tax_due:sum('tax_due'),net_profit:sum('net_profit')};
+}
+
+async function insertTransaction(row){
+  const data = await sbFetch('/transactions', {method:'POST', headers:{Prefer:'return=representation'}, body:JSON.stringify(row)});
+  return data?.[0];
+}
+async function updateTransaction(id,row){
+  const data = await sbFetch(`/transactions?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify(row)});
+  return data?.[0];
+}
+async function deleteTransaction(id){
+  await sbFetch(`/transactions?id=eq.${encodeURIComponent(id)}`, {method:'DELETE'});
+}
+
+async function upsertOrder(order){
+  const id = order.id;
+  const body = {...order}; delete body.id;
+  if(id){
+    const data = await sbFetch(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify(body)});
+    return data?.[0];
+  }
+  const data = await sbFetch('/orders', {method:'POST', headers:{Prefer:'return=representation'}, body:JSON.stringify(body)});
+  return data?.[0];
+}
+async function loadOrders(status='all'){
+  let path = '/orders?select=*&order=pickup_date.asc,order_date.asc,id.asc&limit=5000';
+  if(status !== 'all') path += `&status=eq.${encodeURIComponent(status)}`;
+  return await sbFetch(path);
+}
+async function postOrderToFinance(order){
+  const tx = await insertTransaction({
+    transaction_date: order.order_date || todayISO(),
+    entry_type: 'Income',
+    account: 'Orders',
+    customer_name: order.customer_name || '',
+    payment_type: order.payment_type || '',
+    amount: Number(order.total_amount)||0,
+    notes: `Order Capture | Pickup: ${order.pickup_date||''} | Source: ${order.media_source||''} | Details: ${order.details||''}`
   });
+  await upsertOrder({...order, status:'Posted to Finance', posted_transaction_id: tx.id});
+  return tx;
 }
 
-function buildMonthRows(rows) {
-  const monthRows = [];
-
-  for (let m = 1; m <= 12; m++) {
-    const list = rows.filter(r => {
-      const d = new Date(r.transaction_date + "T00:00:00");
-      return d.getMonth() + 1 === m;
-    });
-
-    const income = list
-      .filter(r => r.entry_type === "Income")
-      .reduce((t, r) => t + Number(r.amount || 0), 0);
-
-    const donations = list
-      .filter(r => r.entry_type === "Donation")
-      .reduce((t, r) => t + Number(r.amount || 0), 0);
-
-    const expenses = list
-      .filter(r => r.entry_type === "Expense")
-      .reduce((t, r) => t + Number(r.amount || 0), 0);
-
-    const cash_income = list
-      .filter(r => r.entry_type === "Income" && r.payment_type === "Cash")
-      .reduce((t, r) => t + Number(r.amount || 0), 0);
-
-    const noncash_gross = list
-      .filter(r => r.entry_type === "Income" && (r.payment_type || "") !== "Cash")
-      .reduce((t, r) => t + Number(r.amount || 0), 0);
-
-    const taxable_sales = income;
-    const tax_due = includedTax(taxable_sales);
-
-    monthRows.push({
-      month: m,
-      income,
-      cash_income,
-      donations,
-      expenses,
-      net_profit: income + donations - expenses,
-      noncash_gross,
-      taxable_sales,
-      tax_due
-    });
-  }
-
-  return monthRows;
+function nav(active){
+  return `<header class="topbar"><div class="brand"><img src="logo.png" onerror="this.style.display='none'"><div><h1>${active.title}</h1><p>${active.subtitle}</p></div></div><nav><a ${active.key==='dashboard'?'class="active"':''} href="index.html">Dashboard</a><a ${active.key==='orders'?'class="active"':''} href="orders.html">Orders</a><a ${active.key==='reports'?'class="active"':''} href="reports.html">Reports</a><a ${active.key==='tax'?'class="active"':''} href="tax.html">Tax</a><a ${active.key==='admin'?'class="active"':''} href="admin.html">Admin</a><button class="exit-btn" onclick="alert('Close this browser tab when finished.')">Exit</button></nav></header>`;
 }
-
-function buildTotals(monthRows) {
-  return {
-    income: monthRows.reduce((t, r) => t + Number(r.income || 0), 0),
-    cash_income: monthRows.reduce((t, r) => t + Number(r.cash_income || 0), 0),
-    donations: monthRows.reduce((t, r) => t + Number(r.donations || 0), 0),
-    expenses: monthRows.reduce((t, r) => t + Number(r.expenses || 0), 0),
-    net_profit: monthRows.reduce((t, r) => t + Number(r.net_profit || 0), 0),
-    noncash_gross: monthRows.reduce((t, r) => t + Number(r.noncash_gross || 0), 0),
-    taxable_sales: monthRows.reduce((t, r) => t + Number(r.taxable_sales || 0), 0),
-    tax_due: monthRows.reduce((t, r) => t + Number(r.tax_due || 0), 0),
-    override_applied: false
-  };
-}
-
-async function getTransactionsRaw(year = "all", month = "all") {
-  let query = window.saltySupabase
-    .from("transactions")
-    .select("*")
-    .order("transaction_date", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(5000);
-
-  if (year && year !== "all") {
-    query = query
-      .gte("transaction_date", `${year}-01-01`)
-      .lte("transaction_date", `${year}-12-31`);
-  }
-
-  if (month && month !== "all" && year && year !== "all") {
-    const mm = String(month).padStart(2, "0");
-    const lastDay = new Date(Number(year), Number(month), 0).getDate();
-    query = query
-      .gte("transaction_date", `${year}-${mm}-01`)
-      .lte("transaction_date", `${year}-${mm}-${lastDay}`);
-  }
-
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
-  return data || [];
-}
-
-async function getYears() {
-  const { data, error } = await window.saltySupabase
-    .from("transactions")
-    .select("transaction_date")
-    .limit(5000);
-
-  if (error) throw new Error(error.message);
-
-  const years = [...new Set(
-    (data || [])
-      .map(r => String(r.transaction_date || "").slice(0, 4))
-      .filter(Boolean)
-  )].sort();
-
-  return years;
-}
-
-async function getCustomers(term = "") {
-  const { data, error } = await window.saltySupabase
-    .from("transactions")
-    .select("customer_name, transaction_date, entry_type")
-    .not("customer_name", "is", null)
-    .limit(5000);
-
-  if (error) throw new Error(error.message);
-
-  const map = new Map();
-  const search = String(term || "").toLowerCase();
-
-  (data || []).forEach(r => {
-    const name = String(r.customer_name || "").trim();
-    if (!name) return;
-    if (search && !name.toLowerCase().includes(search)) return;
-
-    if (!map.has(name)) {
-      map.set(name, {
-        name,
-        orders: 0,
-        last_date: ""
-      });
-    }
-
-    const item = map.get(name);
-
-    if (r.entry_type === "Income" || r.entry_type === "Donation") {
-      item.orders++;
-    }
-
-    if (!item.last_date || r.transaction_date > item.last_date) {
-      item.last_date = r.transaction_date;
-    }
-  });
-
-  const customers = [...map.values()].sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
-
-  return customers;
-}
-
-async function getSummary(year) {
-  const rows = await getTransactionsRaw(year, "all");
-  const monthRows = buildMonthRows(rows);
-  const totals = buildTotals(monthRows);
-
-  return {
-    months: monthRows,
-    totals
-  };
-}
-
-async function getCustomerReport(name) {
-  const { data, error } = await window.saltySupabase
-    .from("transactions")
-    .select("*")
-    .eq("customer_name", name)
-    .order("transaction_date", { ascending: false })
-    .order("id", { ascending: false })
-    .limit(5000);
-
-  if (error) throw new Error(error.message);
-
-  const tx = (data || []).map(normalizeTx);
-
-  const incomeRows = tx.filter(r =>
-    r.entry_type === "Income" || r.entry_type === "Donation"
-  );
-
-  const dates = tx.map(r => r.date).filter(Boolean).sort();
-
-  const summary = {
-    order_count: incomeRows.length,
-    total_income: tx
-      .filter(r => r.entry_type === "Income")
-      .reduce((t, r) => t + Number(r.amount || 0), 0),
-    total_donations: tx
-      .filter(r => r.entry_type === "Donation")
-      .reduce((t, r) => t + Number(r.amount || 0), 0),
-    first_date: dates[0] || "",
-    last_date: dates[dates.length - 1] || ""
-  };
-
-  return {
-    summary,
-    transactions: tx
-  };
-}
-
-async function api(url, opt = {}) {
-  if (!window.saltySupabase) {
-    throw new Error("Supabase is not loaded. Check index.html script order and supabase.js.");
-  }
-
-  const method = (opt.method || "GET").toUpperCase();
-  const parsed = new URL(url, window.location.origin);
-  const path = parsed.pathname;
-
-  if (path === "/api/years") {
-    return {
-      years: await getYears()
-    };
-  }
-
-  if (path === "/api/customers") {
-    const term = parsed.searchParams.get("term") || "";
-    return {
-      customers: await getCustomers(term)
-    };
-  }
-
-  if (path === "/api/summary") {
-    const year = parsed.searchParams.get("year") || new Date().getFullYear();
-    return await getSummary(year);
-  }
-
-  if (path === "/api/transactions" && method === "GET") {
-    const year = parsed.searchParams.get("year") || "all";
-    const month = parsed.searchParams.get("month") || "all";
-    const rows = await getTransactionsRaw(year, month);
-
-    return {
-      transactions: rows.map(normalizeTx)
-    };
-  }
-
-  if (path === "/api/transactions" && method === "POST") {
-    const body = JSON.parse(opt.body || "{}");
-    const dbRow = toDbTx(body);
-
-    const { data, error } = await window.saltySupabase
-      .from("transactions")
-      .insert(dbRow)
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    return {
-      transaction: normalizeTx(data)
-    };
-  }
-
-  if (path === "/api/transactions" && method === "PUT") {
-    const body = JSON.parse(opt.body || "{}");
-    const id = body.id;
-
-    if (!id) throw new Error("Missing transaction ID.");
-
-    const dbRow = toDbTx(body);
-
-    const { data, error } = await window.saltySupabase
-      .from("transactions")
-      .update(dbRow)
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) throw new Error(error.message);
-
-    return {
-      transaction: normalizeTx(data)
-    };
-  }
-
-  if (path.startsWith("/api/transactions/") && method === "DELETE") {
-    const id = path.split("/").pop();
-
-    const { error } = await window.saltySupabase
-      .from("transactions")
-      .delete()
-      .eq("id", id);
-
-    if (error) throw new Error(error.message);
-
-    return {
-      ok: true
-    };
-  }
-
-  if (path === "/api/customer-report") {
-    const name = parsed.searchParams.get("name") || "";
-    return await getCustomerReport(name);
-  }
-
-  throw new Error("Unsupported API route: " + path);
-}
-
-async function loadSharedFooter() {
-  try {
-    let footer = document.querySelector(".site-footer");
-
-    if (!footer) {
-      footer = document.createElement("footer");
-      footer.className = "site-footer";
-      document.body.appendChild(footer);
-    }
-
-    let r = await fetch("footer.html?v=" + Date.now(), {
-      cache: "no-store"
-    });
-
-    if (!r.ok) throw new Error("footer.html not found");
-
-    let html = await r.text();
-    let doc = new DOMParser().parseFromString(html, "text/html");
-    let shared = doc.querySelector("#footerContent");
-
-    footer.innerHTML = shared ? shared.innerHTML : html;
-  } catch (e) {
-    console.warn("Footer load failed:", e);
-  }
-}
-
-document.addEventListener("DOMContentLoaded", loadSharedFooter);
+function footer(){ return `<footer class="site-footer">Created by CajunVeteran 2026 | Version ${APP_VERSION}</footer>`; }
