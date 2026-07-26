@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.07 sync delete/unpost loaded');
+console.log('orders.js v4.1.10 no load status loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -42,13 +42,34 @@ function escapeO(value){
   return String(value ?? '').replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[ch]));
 }
 
+let statusTimer = null;
 function setStatus(message, err=false){
   const el = $o('saveStatus');
   if(!el){ alert(message); return; }
+  if(statusTimer){
+    clearTimeout(statusTimer);
+    statusTimer = null;
+  }
   el.style.display = 'block';
   el.style.background = err ? '#ffe0e0' : '#e8f8ec';
   el.style.borderLeftColor = err ? '#bd4f47' : '#326725';
   el.innerHTML = message;
+
+  // Only keep error messages visible. Success/info messages auto-hide.
+  if(!err){
+    statusTimer = setTimeout(() => {
+      el.style.display = 'none';
+      el.innerHTML = '';
+    }, 3500);
+  }
+}
+
+function clearStatus(){
+  const el = $o('saveStatus');
+  if(el){
+    el.style.display = 'none';
+    el.innerHTML = '';
+  }
 }
 
 function statusId(status){ return String(status || '').replace(/[^a-z0-9]/gi,''); }
@@ -131,7 +152,7 @@ function openOrderForm(order){
     currentPhotoData = order.photo_data || '';
     $o('photoPreviewWrap').innerHTML = currentPhotoData ? `<img class="photo-preview" src="${currentPhotoData}">` : '';
   }
-  setStatus('Order form ready. Start typing customer name to search existing names.');
+  clearStatus();
   scrollTo({top:0,behavior:'smooth'});
   loadCustomerNames($o('customerName').value);
 }
@@ -341,7 +362,7 @@ async function init(){
       r.onload=()=>{currentPhotoData=r.result;$o('photoPreviewWrap').innerHTML=`<img class="photo-preview" src="${currentPhotoData}"><p class="hint"><b>Photo attached.</b> The photo is kept as a reference.</p>`;};
       r.readAsDataURL(file);
     });
-    setStatus('Orders page loaded. Customer name lookup is active.');
+    clearStatus();
     await loadCustomerNames('');
     await renderBoard();
   }catch(err){
