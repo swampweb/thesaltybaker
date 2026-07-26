@@ -436,3 +436,132 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
   color:#8a5a1d;
   border:1px solid #e0bd77;
 }
+
+
+/* =========================
+   ORDER CARD CLEANUP + PAYMENT DROPDOWN v4.1.16
+   ========================= */
+.cleaner-order-card{
+  padding:14px 16px!important;
+  border-radius:16px!important;
+}
+.order-card-badges{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+  margin-bottom:9px;
+}
+.pickup-date-bubble{
+  display:inline-flex;
+  align-items:center;
+  background:#e9f7fb;
+  color:#1e6372;
+  border:1px solid #9ed2de;
+  border-radius:999px;
+  padding:4px 9px;
+  font-weight:900;
+  font-size:12px;
+  white-space:nowrap;
+}
+.clean-card-top{
+  margin-bottom:7px!important;
+}
+.clean-card-top strong{
+  font-size:15px!important;
+}
+.date-row{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  flex-wrap:wrap;
+  font-size:12px;
+  color:#55483d;
+  margin:2px 0 5px;
+}
+.clean-meta{
+  margin:0 0 6px!important;
+}
+.payment-pill-btn{
+  border:1px solid #e0b75a!important;
+  border-radius:999px!important;
+  padding:6px 11px!important;
+  font-size:12px!important;
+  font-weight:900!important;
+  background:#fff0c6!important;
+  color:#7a4b12!important;
+}
+.payment-pill-btn.paid{
+  background:#dff3df!important;
+  color:#2d6b2d!important;
+  border-color:#9bd49b!important;
+}
+.order-details-text{
+  margin:10px 0 12px!important;
+  font-size:14px!important;
+  color:#243038;
+}
+.clean-actions{
+  display:grid!important;
+  grid-template-columns:auto 1fr auto;
+  gap:8px!important;
+  align-items:center;
+}
+.clean-actions .delete-btn{
+  grid-column:1 / 2;
+  width:max-content;
+}
+.clean-actions .post-btn{
+  justify-self:start;
+  padding-left:16px!important;
+  padding-right:16px!important;
+}
+.soft-btn{
+  background:#eadfce!important;
+  color:#1d1d1d!important;
+}
+.payment-modal-backdrop{
+  position:fixed;
+  inset:0;
+  background:rgba(36,48,56,.45);
+  display:none;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+  padding:20px;
+}
+.payment-modal-backdrop.show{
+  display:flex;
+}
+.payment-modal-card{
+  background:#fff;
+  border-radius:18px;
+  border:1px solid var(--line);
+  box-shadow:0 20px 50px rgba(0,0,0,.25);
+  width:min(420px,100%);
+  padding:22px;
+}
+.payment-modal-card h3{
+  margin:0 0 6px;
+  color:var(--teal-dark);
+}
+.payment-modal-card label{
+  margin-top:16px;
+}
+.payment-modal-actions{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:18px;
+}
+@media(max-width:600px){
+  .clean-actions{
+    grid-template-columns:1fr 1fr;
+  }
+  .clean-actions .delete-btn{
+    grid-column:1 / 2;
+  }
+  .pickup-date-bubble{
+    font-size:11px;
+  }
+}

@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.15 payment-on-card loaded');
+console.log('orders.js v4.1.16 clean cards payment dropdown loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -9,6 +9,16 @@ const ORDERS_REST = `${ORDERS_SUPABASE_URL}/rest/v1`;
 const $o = id => document.getElementById(id);
 const moneyO = n => (Number(n)||0).toLocaleString(undefined,{style:'currency',currency:'USD'});
 const todayO = () => new Date().toISOString().slice(0,10);
+const ORDER_MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function formatOrderDate(value){
+  if(!value) return '-';
+  const parts = String(value).slice(0,10).split('-');
+  if(parts.length !== 3) return value;
+  const year = parts[0].slice(-2);
+  const month = ORDER_MONTHS_SHORT[Number(parts[1])-1] || parts[1];
+  const day = parts[2].padStart(2,'0');
+  return `${day} ${month} ${year}`;
+}
 
 let currentPhotoData = '';
 let allOrders = [];
@@ -227,29 +237,32 @@ async function deleteLinkedTransaction(transactionId){
 function orderCard(order){
   const posted = !!order.posted_transaction_id || order.status === 'Posted to Finance';
   const paymentType = String(order.payment_type || '').trim();
-  const paidBadge = paymentType
-    ? `<span class="payment-paid-label">Paid: ${escapeO(paymentType)}</span>`
-    : `<span class="payment-unpaid-label">Payment not set</span>`;
+  const orderDate = formatOrderDate(order.order_date);
+  const pickupDate = formatOrderDate(order.pickup_date);
   const paymentButton = posted
     ? ''
-    : `<button type="button" onclick="setOrderPayment(${order.id})">${paymentType ? 'Change Payment' : 'Add Payment'}</button>`;
+    : `<button type="button" class="payment-pill-btn ${paymentType ? 'paid' : 'unpaid'}" onclick="setOrderPayment(${order.id})">${paymentType ? `Paid: ${escapeO(paymentType)}` : 'Payment not set'}</button>`;
 
-  return `<article class="board-card ${paymentType ? 'paid-order-card' : ''}" draggable="true" data-id="${order.id}">
-    <div class="order-number">Order #${order.id}</div>
-    <div class="board-card-top"><strong>${escapeO(order.customer_name)}</strong><span>${moneyO(order.total_amount)}</span></div>
-    <div class="board-meta">
-      <div><b>Order:</b> ${order.order_date || '-'}</div>
-      <div><b>Pickup:</b> ${order.pickup_date || '-'}</div>
+  return `<article class="board-card cleaner-order-card ${paymentType ? 'paid-order-card' : ''}" draggable="true" data-id="${order.id}">
+    <div class="order-card-badges">
+      <span class="order-number">Order #${order.id}</span>
+      <span class="pickup-date-bubble">Pickup ${pickupDate}</span>
+    </div>
+    <div class="board-card-top clean-card-top">
+      <strong>${escapeO(order.customer_name)}</strong>
+      <span>${moneyO(order.total_amount)}</span>
+    </div>
+    <div class="date-row"><span><b>Order:</b> ${orderDate}</span><span><b>Pickup:</b> ${pickupDate}</span></div>
+    <div class="board-meta clean-meta">
       <div><b>Source:</b> ${escapeO(order.media_source || '-')}</div>
       <div><b>Payment:</b> ${paymentType ? escapeO(paymentType) : '-'}</div>
     </div>
-    <div class="payment-status-row">${paidBadge}</div>
-    ${order.details ? `<p>${escapeO(order.details).slice(0,180)}</p>` : ''}
-    <div class="board-actions">
-      <button type="button" onclick="editOrder(${order.id})">Edit</button>
-      ${paymentButton}
-      ${posted ? `<span class="posted-label">Posted</span><button type="button" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary" onclick="postOrder(${order.id})">Post</button>`}
-      <button type="button" class="danger" onclick="deleteOrder(${order.id})">Delete</button>
+    <div class="payment-status-row">${paymentButton}</div>
+    ${order.details ? `<p class="order-details-text">${escapeO(order.details).slice(0,180)}</p>` : ''}
+    <div class="board-actions clean-actions">
+      <button type="button" class="soft-btn" onclick="editOrder(${order.id})">Edit</button>
+      ${posted ? `<span class="posted-label">Posted</span><button type="button" class="soft-btn" onclick="unpostOrder(${order.id})">Unpost</button>` : `<button type="button" class="primary post-btn" onclick="postOrder(${order.id})">Post</button>`}
+      <button type="button" class="danger delete-btn" onclick="deleteOrder(${order.id})">Delete</button>
     </div>
   </article>`;
 }
@@ -299,13 +312,73 @@ async function updateOrderStatus(id,status){
   }catch(err){ setStatus('Move failed: '+escapeO(err.message||err), true); }
 }
 
+function ensurePaymentModal(){
+  let modal = document.getElementById('paymentModal');
+  if(modal) return modal;
+
+  modal = document.createElement('div');
+  modal.id = 'paymentModal';
+  modal.className = 'payment-modal-backdrop';
+  modal.innerHTML = `
+    <div class="payment-modal-card">
+      <h3 id="paymentModalTitle">Payment Type</h3>
+      <p class="hint">Choose how this order was paid.</p>
+      <label>Payment Type
+        <select id="paymentModalSelect">
+          <option>Apple</option>
+          <option>Cash</option>
+          <option>Cash App</option>
+          <option>Paypal</option>
+          <option>Square</option>
+          <option>Venmo</option>
+          <option>Zelle</option>
+          <option>Other</option>
+        </select>
+      </label>
+      <div class="payment-modal-actions">
+        <button type="button" id="paymentModalCancel">Cancel</button>
+        <button type="button" class="primary" id="paymentModalSave">Save Payment</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  return modal;
+}
+
+function choosePaymentType(current='Venmo', title='Payment Type'){
+  return new Promise(resolve => {
+    const modal = ensurePaymentModal();
+    const select = document.getElementById('paymentModalSelect');
+    const titleEl = document.getElementById('paymentModalTitle');
+    const save = document.getElementById('paymentModalSave');
+    const cancel = document.getElementById('paymentModalCancel');
+
+    titleEl.textContent = title;
+    select.value = current || 'Venmo';
+    if(select.value !== (current || 'Venmo')) select.value = 'Other';
+    modal.classList.add('show');
+
+    const cleanup = value => {
+      modal.classList.remove('show');
+      save.onclick = null;
+      cancel.onclick = null;
+      modal.onclick = null;
+      resolve(value);
+    };
+
+    save.onclick = () => cleanup(select.value);
+    cancel.onclick = () => cleanup(null);
+    modal.onclick = e => { if(e.target === modal) cleanup(null); };
+    setTimeout(() => select.focus(), 50);
+  });
+}
+
 async function setOrderPayment(id){
   try{
     const o = allOrders.find(x => Number(x.id) === Number(id));
     if(!o) return;
 
     const current = String(o.payment_type || '').trim() || 'Venmo';
-    const choice = prompt('Payment type for this order:\n\nApple, Cash, Cash App, Paypal, Square, Venmo, Zelle, Other', current);
+    const choice = await choosePaymentType(current, `Payment for Order #${id}`);
     if(choice === null) return;
 
     const paymentType = String(choice || '').trim();
@@ -336,7 +409,7 @@ async function postOrder(id){
 
     let paymentType = o.payment_type || '';
     if(!paymentType){
-      const choice = prompt('Choose payment type before posting:\n\nApple, Cash, Cash App, Paypal, Square, Venmo, Zelle, Other', 'Venmo');
+      const choice = await choosePaymentType('Venmo', `Payment for Order #${id}`);
       if(choice === null) return;
       paymentType = String(choice || '').trim();
       if(!paymentType){ setStatus('Payment type is required before posting.', true); return; }
