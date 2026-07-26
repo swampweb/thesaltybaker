@@ -1,4 +1,10 @@
-let currentPhotoData='';
+let currentPhotoData = '';
+let allOrders = [];
+const BOARD_STATUSES = ['New Orders','In Progress','Ready','Picked Up','Posted to Finance'];
+
+function statusId(status){
+  return String(status || '').replace(/[^a-z0-9]/gi,'');
+}
 
 function parseLooseDate(value){
   const raw = String(value || '').trim();
@@ -32,9 +38,8 @@ function grabField(text, labels){
 
 function parseQuickText(){
   const t = $('quickText').value.trim();
-
   if(!t){
-    alert('Photo upload is saved as a reference image, but this version does not read handwriting from the photo yet. Type or paste the order details into Quick Text, then click Fill From Quick Text.');
+    alert('Type or paste the order details into Quick Text first. Photo upload is for reference only in this version.');
     return;
   }
 
@@ -72,98 +77,203 @@ function parseQuickText(){
     .trim();
 
   if(details) $('details').value = details;
-
-  alert('Filled what I could. Review the fields before saving.');
+  alert('Filled what I could. Review before saving.');
 }
 
 function fileToDataUrl(file){
   return new Promise((resolve,reject)=>{
-    const r=new FileReader();
-    r.onload=()=>resolve(r.result);
-    r.onerror=reject;
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
     r.readAsDataURL(file);
   });
 }
 
-async function saveOrder(e){
-  e.preventDefault();
-  const order={
-    id:$('orderId').value||undefined,
-    order_date:$('orderDate').value||todayISO(),
-    pickup_date:$('pickupDate').value||null,
-    customer_name:$('customerName').value.trim(),
-    media_source:$('mediaSource').value,
-    details:$('details').value,
-    total_amount:Number($('totalAmount').value)||0,
-    payment_type:$('paymentType').value,
-    status:$('status').value,
-    photo_data:currentPhotoData||null
-  };
-  if(!order.customer_name)return alert('Customer name is required.');
-  await upsertOrder(order);
-  alert('Order saved.');
-  clearForm();
-  await renderOrders();
-}
+function openOrderForm(order){
+  $('orderFormPanel').style.display = 'block';
+  $('formTitle').textContent = order ? 'Edit Order' : 'New Order';
+  clearForm(false);
 
-function clearForm(){
-  $('orderForm').reset();
-  $('orderId').value='';
-  $('orderDate').value=todayISO();
-  currentPhotoData='';
-  $('photoPreviewWrap').innerHTML='';
-  $('status').value='Open';
-}
+  if(order){
+    $('orderId').value = order.id;
+    $('orderDate').value = order.order_date || todayISO();
+    $('pickupDate').value = order.pickup_date || '';
+    $('customerName').value = order.customer_name || '';
+    $('mediaSource').value = order.media_source || '';
+    $('details').value = order.details || '';
+    $('totalAmount').value = order.total_amount || '';
+    $('paymentType').value = order.payment_type || '';
+    $('status').value = order.status || 'New Orders';
+    currentPhotoData = order.photo_data || '';
+    $('photoPreviewWrap').innerHTML = currentPhotoData ? `<img class="photo-preview" src="${currentPhotoData}">` : '';
+  }
 
-function editOrder(id){
-  const o=window._orders.find(x=>x.id===id);
-  if(!o)return;
-  $('orderId').value=o.id;
-  $('orderDate').value=o.order_date||todayISO();
-  $('pickupDate').value=o.pickup_date||'';
-  $('customerName').value=o.customer_name||'';
-  $('mediaSource').value=o.media_source||'';
-  $('details').value=o.details||'';
-  $('totalAmount').value=o.total_amount||'';
-  $('paymentType').value=o.payment_type||'';
-  $('status').value=o.status||'Open';
-  currentPhotoData=o.photo_data||'';
-  $('photoPreviewWrap').innerHTML=currentPhotoData?`<img class="photo-preview" src="${currentPhotoData}">`:'';
   scrollTo({top:0,behavior:'smooth'});
 }
 
+function closeOrderForm(){
+  $('orderFormPanel').style.display = 'none';
+}
+
+function clearForm(resetDate=true){
+  $('orderForm').reset();
+  $('orderId').value = '';
+  if(resetDate) $('orderDate').value = todayISO();
+  currentPhotoData = '';
+  $('photoPreviewWrap').innerHTML = '';
+  $('status').value = 'New Orders';
+}
+
+async function saveOrder(e){
+  e.preventDefault();
+  const order = {
+    id: $('orderId').value || undefined,
+    order_date: $('orderDate').value || todayISO(),
+    pickup_date: $('pickupDate').value || null,
+    customer_name: $('customerName').value.trim(),
+    media_source: $('mediaSource').value,
+    details: $('details').value,
+    total_amount: Number($('totalAmount').value) || 0,
+    payment_type: $('paymentType').value,
+    status: $('status').value || 'New Orders',
+    photo_data: currentPhotoData || null
+  };
+
+  if(!order.customer_name) return alert('Customer name is required.');
+  await upsertOrder(order);
+  closeOrderForm();
+  await renderBoard();
+}
+
+async function updateOrderStatus(id, status){
+  const order = allOrders.find(o => Number(o.id) === Number(id));
+  if(!order) return;
+  await upsertOrder({...order, status});
+  await renderBoard();
+}
+
 async function postOrder(id){
-  const o=window._orders.find(x=>x.id===id);
-  if(!o)return;
-  if(!o.total_amount)return alert('Total amount is required before posting to Finance.');
+  const order = allOrders.find(o => Number(o.id) === Number(id));
+  if(!order) return;
+  if(order.posted_transaction_id){
+    alert('This order has already been posted to Finance.');
+    return;
+  }
+  if(!order.total_amount){
+    alert('Total amount is required before posting to Finance.');
+    return;
+  }
+  if(!order.payment_type){
+    alert('Payment type is recommended before posting to Finance.');
+    return;
+  }
   if(confirm('Post this order to Finance as Income / Orders?')){
-    await postOrderToFinance(o);
+    await postOrderToFinance(order);
+    await renderBoard();
     alert('Posted to Finance.');
-    await renderOrders();
   }
 }
 
-async function renderOrders(){
-  const status=$('statusFilter').value;
-  window._orders=await loadOrders(status);
-  $('ordersList').innerHTML=window._orders.map(o=>`<div class="order-card"><div><h3>${escapeHtml(o.customer_name)} <span class="status-pill">${escapeHtml(o.status||'Open')}</span></h3><p><b>Order:</b> ${o.order_date||''} | <b>Pickup:</b> ${o.pickup_date||''} | <b>Source:</b> ${escapeHtml(o.media_source||'')} | <b>Payment:</b> ${escapeHtml(o.payment_type||'')} | <b>Total:</b> ${money(o.total_amount)}</p><p>${escapeHtml(o.details||'')}</p>${o.photo_data?`<img class="photo-preview" src="${o.photo_data}">`:''}</div><div><button onclick="editOrder(${o.id})">Edit</button> <button class="primary" onclick="postOrder(${o.id})">Post to Finance</button></div></div>`).join('')||'<p>No orders found.</p>';
+async function cancelOrder(id){
+  const order = allOrders.find(o => Number(o.id) === Number(id));
+  if(!order) return;
+  if(confirm('Move this order to Cancelled?')){
+    await upsertOrder({...order, status:'Cancelled'});
+    await renderBoard();
+  }
 }
+
+function orderCard(order){
+  const posted = !!order.posted_transaction_id || order.status === 'Posted to Finance';
+  const photo = order.photo_data ? `<img class="board-photo" src="${order.photo_data}" alt="Order photo reference">` : '';
+  return `
+    <article class="board-card" draggable="true" data-id="${order.id}">
+      <div class="board-card-top">
+        <strong>${escapeHtml(order.customer_name)}</strong>
+        <span>${money(order.total_amount)}</span>
+      </div>
+      <div class="board-meta">
+        <div><b>Pickup:</b> ${order.pickup_date || '-'}</div>
+        <div><b>Source:</b> ${escapeHtml(order.media_source || '-')}</div>
+        <div><b>Payment:</b> ${escapeHtml(order.payment_type || '-')}</div>
+      </div>
+      ${order.details ? `<p>${escapeHtml(order.details).slice(0,180)}</p>` : ''}
+      ${photo}
+      <div class="board-actions">
+        <button type="button" onclick="editOrder(${order.id})">Edit</button>
+        ${posted ? '<span class="posted-label">Posted</span>' : `<button type="button" class="primary" onclick="postOrder(${order.id})">Post</button>`}
+        <button type="button" class="danger" onclick="cancelOrder(${order.id})">Cancel</button>
+      </div>
+    </article>
+  `;
+}
+
+function bindDragDrop(){
+  document.querySelectorAll('.board-card').forEach(card => {
+    card.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('text/plain', card.dataset.id);
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', () => card.classList.remove('dragging'));
+  });
+
+  document.querySelectorAll('.board-column').forEach(col => {
+    col.addEventListener('dragover', e => {
+      e.preventDefault();
+      col.classList.add('drag-over');
+    });
+    col.addEventListener('dragleave', () => col.classList.remove('drag-over'));
+    col.addEventListener('drop', async e => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      const id = e.dataTransfer.getData('text/plain');
+      const status = col.dataset.status;
+      if(id && status) await updateOrderStatus(id, status);
+    });
+  });
+}
+
+async function renderBoard(){
+  allOrders = await loadOrders('all');
+
+  BOARD_STATUSES.forEach(status => {
+    const list = allOrders.filter(o => (o.status || 'New Orders') === status);
+    const id = statusId(status);
+    const listEl = $(`list${id}`);
+    const countEl = $(`count${id}`);
+    if(listEl) listEl.innerHTML = list.map(orderCard).join('') || '<p class="empty-column">Drop orders here.</p>';
+    if(countEl) countEl.textContent = list.length;
+  });
+
+  const cancelled = allOrders.filter(o => o.status === 'Cancelled');
+  $('cancelledOrders').innerHTML = cancelled.map(orderCard).join('') || '<p>No cancelled orders.</p>';
+  bindDragDrop();
+}
+
+window.editOrder = id => {
+  const order = allOrders.find(o => Number(o.id) === Number(id));
+  if(order) openOrderForm(order);
+};
+window.postOrder = postOrder;
+window.cancelOrder = cancelOrder;
 
 async function init(){
-  $('nav').innerHTML=nav({key:'orders',title:'Order Capture',subtitle:'Paper Order Sheet Tracking and Finance Posting'});
-  $('footer').innerHTML=footer();
-  $('orderDate').value=todayISO();
-  $('parseBtn').onclick=parseQuickText;
-  $('clearBtn').onclick=clearForm;
-  $('orderForm').onsubmit=saveOrder;
-  $('statusFilter').onchange=renderOrders;
-  $('photoInput').onchange=async e=>{
-    const f=e.target.files[0];
-    if(!f)return;
-    currentPhotoData=await fileToDataUrl(f);
-    $('photoPreviewWrap').innerHTML=`<img class="photo-preview" src="${currentPhotoData}"><p class="hint"><b>Photo attached.</b> Use Quick Text to fill fields, or manually enter the fields before saving.</p>`;
+  $('nav').innerHTML = nav({key:'orders', title:'Order Board', subtitle:'Digital workflow for paper order tickets'});
+  $('footer').innerHTML = footer();
+  $('orderDate').value = todayISO();
+  $('newOrderBtn').onclick = () => openOrderForm(null);
+  $('refreshBtn').onclick = renderBoard;
+  $('closeFormBtn').onclick = closeOrderForm;
+  $('parseBtn').onclick = parseQuickText;
+  $('clearBtn').onclick = () => clearForm();
+  $('orderForm').onsubmit = saveOrder;
+  $('photoInput').onchange = async e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    currentPhotoData = await fileToDataUrl(file);
+    $('photoPreviewWrap').innerHTML = `<img class="photo-preview" src="${currentPhotoData}"><p class="hint"><b>Photo attached.</b> The photo is kept as a reference. Enter the fields or use Quick Text before saving.</p>`;
   };
-  await renderOrders();
+  await renderBoard();
 }
 
-init().catch(e=>alert(e.message));
+init().catch(e => alert(e.message));

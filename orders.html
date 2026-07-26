@@ -1,5 +1,130 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Order Capture</title><link rel="stylesheet" href="styles.css"></head><body><div id="nav"></div><main>
-<section class="panel"><div class="panel-head"><div><h2>Order Capture</h2><p class="hint">Keep the paper order sheets. Use this page to capture a photo, enter/confirm the order, then post it to Finance when paid.</p></div><div class="filters"><select id="statusFilter"><option value="all">All Orders</option><option>Open</option><option>Ready</option><option>Picked Up</option><option>Paid</option><option>Posted to Finance</option><option>Cancelled</option></select></div></div><p class="notice"><b>Best flow:</b> Photo or quick text → Review fields → Save Order → Post to Finance. This avoids retyping the order into the Dashboard.</p></section>
-<section class="panel"><h2>New / Edit Order</h2><form id="orderForm" class="grid-4"><input type="hidden" id="orderId"><label>Order Date<input id="orderDate" type="date"></label><label>Pickup Date<input id="pickupDate" type="date"></label><label>Customer Name<input id="customerName"></label><label>Media Source<select id="mediaSource"><option></option><option>Messenger</option><option>Facebook</option><option>Text</option><option>Phone</option><option>In Person</option><option>Other</option></select></label><label>Payment<select id="paymentType"><option></option><option>Apple</option><option>Cash</option><option>Cash App</option><option>Paypal</option><option>Square</option><option>Venmo</option><option>Zelle</option><option>Other</option></select></label><label>Total Amount<input id="totalAmount" type="number" step="0.01"></label><label>Status<select id="status"><option>Open</option><option>Ready</option><option>Picked Up</option><option>Paid</option><option>Posted to Finance</option><option>Cancelled</option></select></label><label>Order Photo<input id="photoInput" type="file" accept="image/*"></label><label class="full">Quick Text / Notes Parser<textarea id="quickText" placeholder="Paste or type from paper sheet. Example: Name: Kurstan Polkey, Date: 6/28, P/U Date: 7/31, Media Source: Messenger, Details: 2 dozen mermaid theme, Total: $72"></textarea></label><div class="full"><button type="button" id="parseBtn">Fill From Quick Text</button> <button class="primary" type="submit">Save Order</button> <button type="button" id="clearBtn">Clear</button></div><label class="full">Details<textarea id="details"></textarea></label><div class="full" id="photoPreviewWrap"></div></form></section>
-<section class="panel"><h2>Orders</h2><div id="ordersList"></div></section>
-</main><div id="footer"></div><script src="config.js"></script><script src="common.js"></script><script src="orders.js"></script></body></html>
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Order Board</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="nav"></div>
+<main>
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Digital Order Board</h2>
+        <p class="hint">This replaces the clothesline board while keeping the same order-ticket workflow: new order, in progress, ready, picked up, then posted to finance.</p>
+      </div>
+      <div class="filters">
+        <button class="primary" id="newOrderBtn" type="button">New Order</button>
+        <button id="refreshBtn" type="button">Refresh</button>
+      </div>
+    </div>
+    <p class="notice"><b>Best flow:</b> Create the order card when the order comes in. Move the card across the board as work progresses. When payment is confirmed, click <b>Post to Finance</b> once to create the income transaction automatically.</p>
+  </section>
+
+  <section id="orderFormPanel" class="panel order-form-panel" style="display:none">
+    <div class="panel-head">
+      <h2 id="formTitle">New Order</h2>
+      <button id="closeFormBtn" type="button">Close</button>
+    </div>
+    <form id="orderForm" class="grid-4">
+      <input type="hidden" id="orderId">
+      <label>Order Date
+        <input id="orderDate" type="date">
+      </label>
+      <label>Pickup Date
+        <input id="pickupDate" type="date">
+      </label>
+      <label>Customer Name
+        <input id="customerName" required>
+      </label>
+      <label>Media Source
+        <select id="mediaSource">
+          <option></option>
+          <option>Messenger</option>
+          <option>Facebook</option>
+          <option>Text</option>
+          <option>Phone</option>
+          <option>In Person</option>
+          <option>Other</option>
+        </select>
+      </label>
+      <label>Payment
+        <select id="paymentType">
+          <option></option>
+          <option>Apple</option>
+          <option>Cash</option>
+          <option>Cash App</option>
+          <option>Paypal</option>
+          <option>Square</option>
+          <option>Venmo</option>
+          <option>Zelle</option>
+          <option>Other</option>
+        </select>
+      </label>
+      <label>Total Amount
+        <input id="totalAmount" type="number" step="0.01">
+      </label>
+      <label>Status
+        <select id="status">
+          <option>New Orders</option>
+          <option>In Progress</option>
+          <option>Ready</option>
+          <option>Picked Up</option>
+          <option>Posted to Finance</option>
+          <option>Cancelled</option>
+        </select>
+      </label>
+      <label>Order Photo
+        <input id="photoInput" type="file" accept="image/*">
+      </label>
+      <label class="full">Quick Text Helper
+        <textarea id="quickText" placeholder="Optional quick fill. Example: Name: Kurstan Polkey, Date: 6/28, P/U Date: 7/31, Media Source: Messenger, Payment: Venmo, Details: 2 dozen mermaid theme, Total: 72"></textarea>
+      </label>
+      <div class="full form-actions">
+        <button type="button" id="parseBtn">Fill From Quick Text</button>
+        <button class="primary" type="submit">Save Order</button>
+        <button type="button" id="clearBtn">Clear</button>
+      </div>
+      <label class="full">Details
+        <textarea id="details"></textarea>
+      </label>
+      <div class="full" id="photoPreviewWrap"></div>
+    </form>
+  </section>
+
+  <section class="order-board" id="orderBoard">
+    <div class="board-column" data-status="New Orders">
+      <div class="board-column-head"><h3>New Orders</h3><span id="countNewOrders">0</span></div>
+      <div class="board-list" id="listNewOrders"></div>
+    </div>
+    <div class="board-column" data-status="In Progress">
+      <div class="board-column-head"><h3>In Progress</h3><span id="countInProgress">0</span></div>
+      <div class="board-list" id="listInProgress"></div>
+    </div>
+    <div class="board-column" data-status="Ready">
+      <div class="board-column-head"><h3>Ready</h3><span id="countReady">0</span></div>
+      <div class="board-list" id="listReady"></div>
+    </div>
+    <div class="board-column" data-status="Picked Up">
+      <div class="board-column-head"><h3>Picked Up</h3><span id="countPickedUp">0</span></div>
+      <div class="board-list" id="listPickedUp"></div>
+    </div>
+    <div class="board-column" data-status="Posted to Finance">
+      <div class="board-column-head"><h3>Posted</h3><span id="countPostedtoFinance">0</span></div>
+      <div class="board-list" id="listPostedtoFinance"></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Cancelled Orders</h2>
+    <div id="cancelledOrders"></div>
+  </section>
+</main>
+<div id="footer"></div>
+<script src="config.js"></script>
+<script src="common.js"></script>
+<script src="orders.js"></script>
+</body>
+</html>
