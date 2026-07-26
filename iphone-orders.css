@@ -21,3 +21,7 @@ button,input,select,textarea{font:inherit}
 
 /* Collapsed weekly iPhone cards v1.1 */
 .mobile-week-group{display:flex;flex-direction:column;gap:10px;margin-bottom:14px}.mobile-week-title{display:flex;align-items:center;justify-content:space-between;background:#f6ead7;border:1px solid var(--line);border-radius:14px;padding:9px 11px;color:#6b4b30;font-size:13px;font-weight:1000}.mobile-week-title b{background:#fff;border:1px solid var(--line);border-radius:999px;min-width:26px;text-align:center;padding:2px 8px;color:var(--teal-dark)}.collapsed-mobile-card{cursor:pointer}.collapsed-mobile-card .mobile-card-expanded{display:none}.collapsed-mobile-card.expanded .mobile-card-expanded{display:block}.collapsed-mobile-card.expanded .tap-more-hint{display:none}.tap-more-hint{margin-top:8px;color:#8a6b42;font-size:11px;font-weight:1000;text-align:center;opacity:.85}
+
+
+/* Expand collapse controls v1.2 */
+.mobile-collapse-toolbar{display:flex;gap:8px;margin:0 0 10px}.mobile-collapse-toolbar button,.mobile-week-toggle-btn,.mobile-expand-btn{border:1px solid var(--line);background:#fff8ee;color:#6b4b30;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:1000}.mobile-week-toggle-btn{display:inline-flex;align-items:center;gap:6px}.mobile-week-group.collapsed .mobile-week-body{display:none}.mobile-week-body{display:flex;flex-direction:column;gap:10px}.mobile-expand-btn{display:block;width:100%;margin-top:8px}.collapsed-mobile-card.expanded .mobile-expand-btn{background:#e9f7fb;color:var(--teal-dark)}

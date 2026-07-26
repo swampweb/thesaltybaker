@@ -622,3 +622,9 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
 .collapsed-order.expanded .order-card-expanded{display:block;}
 .collapsed-order.expanded .tap-more-hint{display:none;}
 .tap-more-hint{margin-top:8px;color:#8a6b42;font-size:11px;font-weight:900;text-align:center;opacity:.85;}
+
+
+/* =========================
+   EXPAND COLLAPSE CONTROLS v4.1.19
+   ========================= */
+.board-collapse-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}.board-collapse-toolbar button,.week-toggle-btn,.card-expand-btn{border:1px solid var(--line);background:#fff8ee;color:#6b4b30;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:900}.week-toggle-btn{display:inline-flex;align-items:center;gap:6px}.week-toggle-btn b{margin-left:2px}.week-group.collapsed .week-group-body{display:none}.week-group-body{display:flex;flex-direction:column;gap:8px}.card-expand-btn{display:block;width:100%;margin-top:8px}.collapsed-order.expanded .card-expand-btn{background:#e9f7fb;color:var(--teal-dark)}

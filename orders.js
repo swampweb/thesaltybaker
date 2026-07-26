@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.18 collapsed weekly cards loaded');
+console.log('orders.js v4.1.19 expand collapse controls loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -39,17 +39,38 @@ function weekGroupKey(order){
   saturday.setDate(sunday.getDate() + 6);
   return `${isoFromDate(sunday)}|${formatOrderDate(isoFromDate(sunday))} - ${formatOrderDate(isoFromDate(saturday))}`;
 }
+function toggleWeekGroup(button, event){
+  if(event) event.stopPropagation();
+  const group = button.closest('.week-group');
+  if(!group) return;
+  group.classList.toggle('collapsed');
+  const isCollapsed = group.classList.contains('collapsed');
+  const label = button.querySelector('.week-toggle-text');
+  if(label) label.textContent = isCollapsed ? 'Expand' : 'Collapse';
+}
+window.toggleWeekGroup = toggleWeekGroup;
+
+function expandAllOrderCards(){
+  document.querySelectorAll('.collapsed-order').forEach(card => card.classList.add('expanded'));
+}
+function collapseAllOrderCards(){
+  document.querySelectorAll('.collapsed-order').forEach(card => card.classList.remove('expanded'));
+}
+window.expandAllOrderCards = expandAllOrderCards;
+window.collapseAllOrderCards = collapseAllOrderCards;
+
 function renderWeekGroups(list){
   if(!list.length) return '<p class="empty-column">Drop orders here.</p>';
+  const toolbar = '<div class="board-collapse-toolbar"><button type="button" onclick="expandAllOrderCards()">Expand Cards</button><button type="button" onclick="collapseAllOrderCards()">Collapse Cards</button></div>';
   const groups = new Map();
   list.forEach(order => {
     const key = weekGroupKey(order);
     if(!groups.has(key)) groups.set(key, []);
     groups.get(key).push(order);
   });
-  return [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,items]) => {
+  return toolbar + [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,items]) => {
     const label = key.split('|')[1];
-    return `<div class="week-group"><div class="week-group-title"><span>${label}</span><b>${items.length}</b></div>${items.map(orderCard).join('')}</div>`;
+    return `<div class="week-group"><div class="week-group-title"><span>${label}</span><button type="button" class="week-toggle-btn" onclick="toggleWeekGroup(this,event)"><span class="week-toggle-text">Collapse</span> <b>${items.length}</b></button></div><div class="week-group-body">${items.map(orderCard).join('')}</div></div>`;
   }).join('');
 }
 
@@ -306,7 +327,7 @@ function orderCard(order){
         <button type="button" class="danger delete-btn small-action-btn" onclick="deleteOrder(${order.id})">Delete</button>
       </div>
     </div>
-    <div class="tap-more-hint">Tap card for details</div>
+    <button type="button" class="card-expand-btn" onclick="toggleOrderCard(${order.id}, event)">Expand / Collapse</button>
   </article>`;
 }
 

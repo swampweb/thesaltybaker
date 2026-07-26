@@ -1,4 +1,4 @@
-console.log('iphone-orders.js v1.1 collapsed weekly cards loaded');
+console.log('iphone-orders.js v1.2 expand collapse controls loaded');
 
 const SUPABASE_URL = 'https://fprbzavehflzqcmxvbxx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZwcmJ6YXZlaGZsenFjbXh2Ynh4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MjMxNzEsImV4cCI6MjA5OTk5OTE3MX0.8_D_7kx9f2as46N7ZrNhGZen25e8TGFd2ue5p1TgTvg';
@@ -118,20 +118,32 @@ function card(o){
         ${posted?`<button type="button" class="ghost" onclick="unpostOrder(${o.id})">Unpost</button>`:`<button type="button" class="primary" onclick="postOrder(${o.id})">Post</button>`}
       </div>
     </div>
-    <div class="tap-more-hint">Tap card for details</div>
+    <button type="button" class="mobile-expand-btn" onclick="toggleMobileCard(${o.id}, event)">Expand / Collapse</button>
   </article>`;
 }
+window.toggleMobileWeekGroup=function(button,event){
+  if(event) event.stopPropagation();
+  const group=button.closest('.mobile-week-group');
+  if(!group) return;
+  group.classList.toggle('collapsed');
+  const label=button.querySelector('.mobile-week-toggle-text');
+  if(label) label.textContent=group.classList.contains('collapsed')?'Expand':'Collapse';
+};
+window.expandAllMobileCards=function(){document.querySelectorAll('.collapsed-mobile-card').forEach(c=>c.classList.add('expanded'));};
+window.collapseAllMobileCards=function(){document.querySelectorAll('.collapsed-mobile-card').forEach(c=>c.classList.remove('expanded'));};
+
 function renderWeekGroups(rows){
   if(!rows.length) return '<div class="empty-state">No orders found.</div>';
+  const toolbar='<div class="mobile-collapse-toolbar"><button type="button" onclick="expandAllMobileCards()">Expand Cards</button><button type="button" onclick="collapseAllMobileCards()">Collapse Cards</button></div>';
   const groups=new Map();
   rows.forEach(order=>{
     const key=weekGroupKey(order);
     if(!groups.has(key)) groups.set(key,[]);
     groups.get(key).push(order);
   });
-  return [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,items])=>{
+  return toolbar + [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,items])=>{
     const label=key.split('|')[1];
-    return `<section class="mobile-week-group"><div class="mobile-week-title"><span>${label}</span><b>${items.length}</b></div>${items.map(card).join('')}</section>`;
+    return `<section class="mobile-week-group"><div class="mobile-week-title"><span>${label}</span><button type="button" class="mobile-week-toggle-btn" onclick="toggleMobileWeekGroup(this,event)"><span class="mobile-week-toggle-text">Collapse</span> <b>${items.length}</b></button></div><div class="mobile-week-body">${items.map(card).join('')}</div></section>`;
   }).join('');
 }
 
