@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Salty Baker iPhone Orders</title>
+  <link rel="stylesheet" href="iphone-orders.css?v=1001">
+  <link rel="icon" href="favicon.ico" sizes="any">
+</head>
+<body>
+  <header class="mobile-header">
+    <div>
+      <h1>Orders</h1>
+      <p>The Salty Baker</p>
+    </div>
+    <button id="refreshBtn" type="button" class="icon-btn">Refresh</button>
+  </header>
+
+  <main class="mobile-main">
+    <section class="mobile-summary" id="mobileSummary">
+      <div><span>Open</span><strong id="openCount">0</strong></div>
+      <div><span>Paid</span><strong id="paidCount">0</strong></div>
+      <div><span>Ready</span><strong id="readyCount">0</strong></div>
+    </section>
+
+    <section class="mobile-toolbar">
+      <input id="searchInput" type="search" placeholder="Search order, customer, pickup...">
+      <select id="statusFilter">
+        <option value="open">Open Orders</option>
+        <option value="all">All Orders</option>
+        <option>New Orders</option>
+        <option>In Progress</option>
+        <option>Ready</option>
+        <option>Picked Up</option>
+        <option>Posted to Finance</option>
+        <option>Cancelled</option>
+      </select>
+    </section>
+
+    <section id="statusMessage" class="status-message" style="display:none"></section>
+    <section id="ordersList" class="mobile-orders-list"></section>
+  </main>
+
+  <button id="newOrderBtn" type="button" class="fab">+ New Order</button>
+
+  <div id="orderModal" class="modal-backdrop" aria-hidden="true">
+    <form id="orderForm" class="modal-card">
+      <div class="modal-head">
+        <h2 id="modalTitle">New Order</h2>
+        <button id="closeModalBtn" type="button" class="x-btn">×</button>
+      </div>
+
+      <input type="hidden" id="orderId">
+
+      <label>Customer Name
+        <input id="customerName" list="customerNameList" autocomplete="off" required>
+        <datalist id="customerNameList"></datalist>
+      </label>
+
+      <div class="two-col">
+        <label>Order Date
+          <input id="orderDate" type="date" required>
+        </label>
+        <label>Pickup Date
+          <input id="pickupDate" type="date">
+        </label>
+      </div>
+
+      <div class="two-col">
+        <label>Total
+          <input id="totalAmount" type="number" step="0.01" min="0" placeholder="0.00">
+        </label>
+        <label>Source
+          <select id="mediaSource">
+            <option></option>
+            <option>Messenger</option>
+            <option>Facebook</option>
+            <option>Text</option>
+            <option>Phone</option>
+            <option>In Person</option>
+            <option>Other</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="two-col">
+        <label>Status
+          <select id="status">
+            <option>New Orders</option>
+            <option>In Progress</option>
+            <option>Ready</option>
+            <option>Picked Up</option>
+            <option>Posted to Finance</option>
+            <option>Cancelled</option>
+          </select>
+        </label>
+        <label>Payment if paid
+          <select id="paymentType">
+            <option></option>
+            <option>Apple</option>
+            <option>Cash</option>
+            <option>Cash App</option>
+            <option>Paypal</option>
+            <option>Square</option>
+            <option>Venmo</option>
+            <option>Zelle</option>
+            <option>Other</option>
+          </select>
+        </label>
+      </div>
+
+      <label>Details
+        <textarea id="details" rows="4" placeholder="Order details..."></textarea>
+      </label>
+
+      <div class="modal-actions">
+        <button id="deleteOrderBtn" type="button" class="danger ghost" style="display:none">Delete</button>
+        <button type="submit" class="primary">Save Order</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="paymentModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card small-modal">
+      <div class="modal-head">
+        <h2 id="paymentTitle">Payment</h2>
+        <button id="closePaymentBtn" type="button" class="x-btn">×</button>
+      </div>
+      <label>Payment Type
+        <select id="paymentSelect">
+          <option>Apple</option>
+          <option>Cash</option>
+          <option>Cash App</option>
+          <option>Paypal</option>
+          <option>Square</option>
+          <option>Venmo</option>
+          <option>Zelle</option>
+          <option>Other</option>
+        </select>
+      </label>
+      <div class="modal-actions">
+        <button id="savePaymentBtn" type="button" class="primary">Save Payment</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="iphone-orders.js?v=1001"></script>
+</body>
+</html>
