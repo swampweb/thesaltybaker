@@ -332,3 +332,77 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
   border-color:#bd4f47;
   color:#bd4f47;
 }
+
+/* =========================
+   DASHBOARD RESTRUCTURE v4.1.12
+   ========================= */
+.dashboard-summary-cards{
+  grid-template-columns:repeat(5,minmax(160px,1fr));
+}
+.orders-card{
+  border-left-color:#d9a966!important;
+  background:#fff8dd!important;
+}
+.orders-card small{
+  display:block;
+  margin-top:6px;
+  color:#94633f;
+  font-weight:800;
+  line-height:1.25;
+}
+.dashboard-panel-head{
+  align-items:flex-start;
+}
+.filter-label{
+  gap:4px;
+  min-width:130px;
+}
+.entry-form-clean{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(130px,1fr));
+  gap:14px;
+  align-items:end;
+}
+.entry-form-clean label:nth-of-type(4){
+  grid-column:span 2;
+}
+.entry-form-clean .full{
+  grid-column:1/-1;
+}
+.entry-form-clean input,
+.entry-form-clean select{
+  width:100%;
+}
+.spaced-actions{
+  margin-top:4px;
+}
+.last-entry-clean{
+  margin-top:18px!important;
+  padding:16px 18px!important;
+}
+.last-entry-clean #lastEntryDetails,
+#lastEntryDetails{
+  margin-top:5px;
+}
+.customer-search-row{
+  margin-bottom:18px;
+  align-items:end;
+}
+.customer-report-table-wrap{
+  margin-top:16px;
+}
+.monthly-input-filters{
+  align-items:end;
+}
+.monthly-input-filters input{
+  min-width:220px;
+}
+@media(max-width:1200px){
+  .dashboard-summary-cards{grid-template-columns:repeat(2,1fr);}
+  .entry-form-clean{grid-template-columns:repeat(2,1fr);}
+  .entry-form-clean label:nth-of-type(4){grid-column:auto;}
+}
+@media(max-width:700px){
+  .dashboard-summary-cards,
+  .entry-form-clean{grid-template-columns:1fr;}
+}
