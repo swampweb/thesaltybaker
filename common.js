@@ -73,8 +73,14 @@ function calculateMonthly(rows){
     const expenses=list.filter(r=>r.entry_type==='Expense').reduce((t,r)=>t+Number(r.amount||0),0);
     const cash=list.filter(r=>r.entry_type==='Income' && String(r.payment_type||'')==='Cash').reduce((t,r)=>t+Number(r.amount||0),0);
     const noncash=list.filter(r=>r.entry_type==='Income' && String(r.payment_type||'')!=='Cash').reduce((t,r)=>t+Number(r.amount||0),0);
-    const filing=filingAmount(income);
-    out.push({month:m,income,donations,expenses,cash_income:cash,noncash_gross:noncash,taxable_sales:filing,tax_due:includedTax(income),net_profit:income+donations-expenses});
+
+    // Filing Amount / Taxable Sales must EXCLUDE Cash sales.
+    // Example: Venmo $72 + Cash $72 = Non-Cash Gross $72.
+    // Filing Amount backs included tax out of the Non-Cash Gross only.
+    const filing=filingAmount(noncash);
+    const taxDue=includedTax(noncash);
+
+    out.push({month:m,income,donations,expenses,cash_income:cash,noncash_gross:noncash,taxable_sales:filing,tax_due:taxDue,net_profit:income+donations-expenses});
   }
   return out;
 }
