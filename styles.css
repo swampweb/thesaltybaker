@@ -628,3 +628,24 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
    EXPAND COLLAPSE CONTROLS v4.1.19
    ========================= */
 .board-collapse-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 10px}.board-collapse-toolbar button,.week-toggle-btn,.card-expand-btn{border:1px solid var(--line);background:#fff8ee;color:#6b4b30;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:900}.week-toggle-btn{display:inline-flex;align-items:center;gap:6px}.week-toggle-btn b{margin-left:2px}.week-group.collapsed .week-group-body{display:none}.week-group-body{display:flex;flex-direction:column;gap:8px}.card-expand-btn{display:block;width:100%;margin-top:8px}.collapsed-order.expanded .card-expand-btn{background:#e9f7fb;color:var(--teal-dark)}
+
+/* =========================
+   PC ORDER CARD SPACING FIX v4.1.20
+   ========================= */
+.week-group-body{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:14px!important;
+}
+.week-group .board-card{
+  margin-bottom:0!important;
+}
+.board-list .week-group{
+  margin-bottom:18px!important;
+}
+.week-group-title{
+  margin-bottom:12px!important;
+}
+.board-column .board-list{
+  gap:14px!important;
+}
