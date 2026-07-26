@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.11 order numbers payment prompt loaded');
+console.log('orders.js v4.1.14 save-null-fix loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -147,7 +147,7 @@ function openOrderForm(order){
     $o('mediaSource').value = order.media_source || '';
     $o('details').value = order.details || '';
     $o('totalAmount').value = order.total_amount || '';
-    $o('paymentType').value = order.payment_type || '';
+    if($o('paymentType')) $o('paymentType').value = order.payment_type || '';
     $o('status').value = order.status || 'New Orders';
   }
   clearStatus();
@@ -171,7 +171,7 @@ function buildPayload(){
     media_source: $o('mediaSource').value || '',
     details: $o('details').value || '',
     total_amount: Number($o('totalAmount').value) || 0,
-    payment_type: $o('paymentType').value || '',
+    payment_type: ($o('paymentType') ? $o('paymentType').value : ''),
     status: $o('status').value || 'New Orders',
     photo_data: currentPhotoData || null
   };
