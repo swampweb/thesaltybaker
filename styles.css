@@ -649,3 +649,33 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
 .board-column .board-list{
   gap:14px!important;
 }
+
+/* =========================
+   WEEK GROUP COLLAPSE DISPLAY FIX v4.1.21
+   ========================= */
+.week-group.collapsed .week-group-body{
+  display:none!important;
+}
+.week-group:not(.collapsed) .week-group-body{
+  display:flex!important;
+  flex-direction:column!important;
+  gap:14px!important;
+}
+
+
+/* Website Orders collapse hard fix v4.1.24 */
+.week-group.collapsed > .week-group-body{display:none!important;}
+.week-group:not(.collapsed) > .week-group-body{display:flex!important;flex-direction:column!important;gap:14px!important;}
+.board-card:not(.expanded) > .order-card-expanded{display:none!important;}
+.board-card.expanded > .order-card-expanded{display:block!important;}
+
+
+/* Website Orders week collapse direct fix v4.1.25 */
+.week-group.collapsed .board-card{display:none!important;}
+.week-group.collapsed .week-group-body{display:none!important;}
+.week-group:not(.collapsed) .week-group-body{display:flex!important;flex-direction:column!important;gap:14px!important;}
+
+
+/* Website Orders week re-render collapse fix v4.1.26 */
+.week-group.collapsed .week-group-body,
+.week-group.collapsed .board-card{display:none!important;}
