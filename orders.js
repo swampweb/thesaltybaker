@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.27 website week collapse fixed loaded');
+console.log('orders.js v4.1.26 week rerender collapse fix loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -418,10 +418,16 @@ function bindCollapseDelegates(){
   if(window.__ordersCollapseDelegatesBound) return;
   window.__ordersCollapseDelegatesBound = true;
 
-  // Only handle individual card expand/collapse here.
-  // Week collapse is handled by toggleWeekGroupKey(), which re-renders the board.
-  // Do NOT intercept .week-toggle-btn here or week collapse will only change the label.
   document.addEventListener('click', event => {
+    const weekButton = event.target.closest('.week-toggle-btn');
+    if(weekButton){
+      event.preventDefault();
+      event.stopPropagation();
+      const group = weekButton.closest('.week-group');
+      setWeekGroupCollapsed(group, !group.classList.contains('collapsed'));
+      return;
+    }
+
     const cardButton = event.target.closest('.card-expand-btn');
     if(cardButton){
       event.preventDefault();
