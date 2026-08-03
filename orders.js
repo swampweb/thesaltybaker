@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.30 finance type account loaded');
+console.log('orders.js v4.1.31 post finance variables fix loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -590,7 +590,15 @@ async function postOrder(id){
     const o = allOrders.find(x=>Number(x.id)===Number(id));
     if(!o)return;
     if(o.posted_transaction_id){ setStatus('This order is already posted.', true); return; }
-    if(!o.total_amount){ setStatus('Total amount is required before posting.', true); return; }
+
+    const entryType = o.finance_entry_type || 'Income';
+    const account = o.finance_account || defaultFinanceAccount(entryType);
+    const amount = Number(o.total_amount)||0;
+
+    if(amount <= 0 && entryType === 'Income'){
+      setStatus('Total amount is required before posting Income. Change Finance Type to Donation if this needs to post as a donation/no-charge item.', true);
+      return;
+    }
 
     let paymentType = o.payment_type || '';
     if(!paymentType){
@@ -611,7 +619,17 @@ async function postOrder(id){
         notes: `Order #${o.id} | Order Board | Pickup: ${o.pickup_date||''} | Finance: ${entryType} / ${account} | Source: ${o.media_source||''} | Details: ${o.details||''}`
       };
       const tx = await rest('/transactions', {method:'POST', headers:{Prefer:'return=representation'}, body:JSON.stringify(txPayload)});
-      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status:'Posted to Finance', payment_type:paymentType, finance_entry_type:entryType, finance_account:account, posted_transaction_id:tx?.[0]?.id || null})});
+      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {
+        method:'PATCH',
+        headers:{Prefer:'return=representation'},
+        body:JSON.stringify({
+          status:'Posted to Finance',
+          payment_type:paymentType,
+          finance_entry_type:entryType,
+          finance_account:account,
+          posted_transaction_id:tx?.[0]?.id || null
+        })
+      });
       setStatus(`Order #${o.id} posted to Finance as ${escapeO(entryType)} / ${escapeO(account)}.`);
       await renderBoard();
     }
