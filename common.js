@@ -80,7 +80,7 @@ function calculateMonthly(rows){
     const filing=filingAmount(noncash);
     const taxDue=includedTax(noncash);
 
-    out.push({month:m,income,donations,expenses,cash_income:cash,noncash_gross:noncash,taxable_sales:filing,tax_due:taxDue,net_profit:income+donations-expenses});
+    out.push({month:m,income,donations,expenses,cash_income:cash,noncash_gross:noncash,taxable_sales:filing,tax_due:taxDue,net_profit:income-expenses});
   }
   return out;
 }

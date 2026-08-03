@@ -679,3 +679,22 @@ button{border:0;border-radius:12px;background:var(--tan);padding:10px 16px;font-
 /* Website Orders week re-render collapse fix v4.1.26 */
 .week-group.collapsed .week-group-body,
 .week-group.collapsed .board-card{display:none!important;}
+
+
+/* Website Orders native week collapse fix v4.1.28 */
+details.native-week-group{display:block!important;margin-bottom:18px!important;}
+details.native-week-group > summary.native-week-summary{list-style:none!important;cursor:pointer!important;user-select:none!important;}
+details.native-week-group > summary.native-week-summary::-webkit-details-marker{display:none!important;}
+details.native-week-group > summary.native-week-summary::before{content:'▾';display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-right:6px;color:#6b4b30;font-weight:900;transition:transform .15s ease;}
+details.native-week-group:not([open]) > summary.native-week-summary::before{transform:rotate(-90deg);}
+details.native-week-group:not([open]) > .week-group-body{display:none!important;}
+details.native-week-group[open] > .week-group-body{display:flex!important;flex-direction:column!important;gap:14px!important;}
+details.native-week-group[open] .when-closed{display:none!important;}
+details.native-week-group:not([open]) .when-open{display:none!important;}
+details.native-week-group:not([open]) .when-closed{display:inline!important;}
+details.native-week-group[open] .when-open{display:inline!important;}
+.native-week-toggle{pointer-events:none!important;}
+
+
+/* Order Board finance type/account fields v4.1.30 */
+#financeEntryType,#financeAccount{background:#fffefa;}

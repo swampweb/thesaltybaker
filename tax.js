@@ -66,7 +66,7 @@ function currentTableTotals(){
 }
 
 function updateHeader(){
-  const sales = monthData.reduce((t,r)=>t + Number(r.income||0) + Number(r.donations||0), 0);
+  const sales = monthData.reduce((t,r)=>t + Number(r.income||0), 0);
   const exp = monthData.reduce((t,r)=>t + Number(r.expenses||0), 0);
   const cash = monthData.reduce((t,r)=>t + Number(r.cash_income||0), 0);
   const filing = monthData.reduce((t,r)=>t + Number(r.taxable_sales||0), 0);

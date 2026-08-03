@@ -109,9 +109,9 @@ async function load(){
   const monthRows=calculateMonthly(rows);
   const totals=totalsFromMonthly(monthRows);
 
-  const totalIncome=Number(totals.income||0)+Number(totals.donations||0);
+  const totalIncome=Number(totals.income||0);
   const totalExpenses=Number(totals.expenses||0);
-  const totalProfit=totalIncome-totalExpenses;
+  const totalProfit=Number(totals.income||0)-totalExpenses;
 
   $('rIncome').textContent=moneyLabel(totalIncome);
   $('rExpenses').textContent=moneyLabel(totalExpenses);
@@ -119,7 +119,7 @@ async function load(){
   $('rFiling').textContent=moneyLabel(totals.taxable_sales);
 
   const monthlySeries=[
-    {label:'Income',color:colors[0],data:monthRows.map(x=>Number(x.income||0)+Number(x.donations||0)),value:totalIncome},
+    {label:'Income',color:colors[0],data:monthRows.map(x=>Number(x.income||0)),value:totalIncome},
     {label:'Expenses',color:colors[4],data:monthRows.map(x=>Number(x.expenses||0)),value:totalExpenses}
   ];
   bars('monthlyChart',months,monthlySeries,285);
@@ -135,7 +135,7 @@ async function load(){
   for(const y of years){
     const rr=await loadTransactions(y);
     const tt=totalsFromMonthly(calculateMonthly(rr));
-    const inc=Number(tt.income||0)+Number(tt.donations||0);
+    const inc=Number(tt.income||0);
     const exp=Number(tt.expenses||0);
     yrData.push({year:y,income:inc,expenses:exp,profit:inc-exp});
   }

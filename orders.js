@@ -1,4 +1,4 @@
-console.log('orders.js v4.1.26 week rerender collapse fix loaded');
+console.log('orders.js v4.1.30 finance type account loaded');
 
 // Self-contained Supabase settings for Orders page.
 // This bypasses any cached common.js header issue.
@@ -117,23 +117,21 @@ function renderWeekGroups(list){
 
   return toolbar + [...groups.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,items]) => {
     const label = key.split('|')[1];
-    const collapsed = collapsedWeekGroups.has(key);
     const encodedKey = encodeURIComponent(key);
-    const buttonText = collapsed ? 'Expand' : 'Collapse';
-    const bodyHtml = collapsed ? '' : `<div class="week-group-body">${items.map(orderCard).join('')}</div>`;
 
-    return `<div class="week-group ${collapsed ? 'collapsed' : ''}" data-week-key="${encodedKey}">
-      <div class="week-group-title">
-        <span>${label}</span>
-        <button type="button" class="week-toggle-btn" aria-expanded="${collapsed ? 'false' : 'true'}" onclick="return toggleWeekGroupKey('${encodedKey}', event)">
-          <span class="week-toggle-text">${buttonText}</span> <b>${items.length}</b>
-        </button>
-      </div>
-      ${bodyHtml}
-    </div>`;
+    return `<details class="week-group native-week-group" data-week-key="${encodedKey}" open>
+      <summary class="week-group-title native-week-summary">
+        <span class="week-label">${label}</span>
+        <span class="week-toggle-btn native-week-toggle" aria-hidden="true">
+          <span class="week-toggle-text when-open">Collapse</span>
+          <span class="week-toggle-text when-closed">Expand</span>
+          <b>${items.length}</b>
+        </span>
+      </summary>
+      <div class="week-group-body">${items.map(orderCard).join('')}</div>
+    </details>`;
   }).join('');
 }
-
 
 let currentPhotoData = '';
 let allOrders = [];
@@ -228,6 +226,18 @@ function setSelectValue(id, value){
   el.value = found ? found.value : 'Other';
 }
 
+
+function defaultFinanceAccount(entryType){
+  return entryType === 'Donation' ? 'Donation' : 'Orders';
+}
+function syncFinanceAccount(){
+  const typeEl = $o('financeEntryType');
+  const accountEl = $o('financeAccount');
+  if(!typeEl || !accountEl) return;
+  if(typeEl.value === 'Donation' && (!accountEl.value || accountEl.value === 'Orders')) accountEl.value = 'Donation';
+  if(typeEl.value === 'Income' && (!accountEl.value || accountEl.value === 'Donation')) accountEl.value = 'Orders';
+}
+
 function parseQuickText(){
   const t = $o('quickText').value.trim();
   if(!t){ setStatus('Type or paste order text first. Photo upload is reference-only in this version.', true); return; }
@@ -282,6 +292,9 @@ function openOrderForm(order){
     $o('details').value = order.details || '';
     $o('totalAmount').value = order.total_amount || '';
     if($o('paymentType')) $o('paymentType').value = order.payment_type || '';
+    if($o('financeEntryType')) $o('financeEntryType').value = order.finance_entry_type || 'Income';
+    if($o('financeAccount')) $o('financeAccount').value = order.finance_account || defaultFinanceAccount($o('financeEntryType')?.value || 'Income');
+    syncFinanceAccount();
     $o('status').value = order.status || 'New Orders';
   }
   clearStatus();
@@ -295,7 +308,10 @@ function clearForm(resetDate=true){
   $o('orderId').value = '';
   if(resetDate) $o('orderDate').value = todayO();
   $o('status').value = 'New Orders';
+  if($o('financeEntryType')) $o('financeEntryType').value = 'Income';
+  if($o('financeAccount')) $o('financeAccount').value = 'Orders';
 }
+
 
 function buildPayload(){
   return {
@@ -306,6 +322,8 @@ function buildPayload(){
     details: $o('details').value || '',
     total_amount: Number($o('totalAmount').value) || 0,
     payment_type: ($o('paymentType') ? $o('paymentType').value : ''),
+    finance_entry_type: ($o('financeEntryType') ? $o('financeEntryType').value : 'Income'),
+    finance_account: ($o('financeAccount') ? $o('financeAccount').value : defaultFinanceAccount($o('financeEntryType')?.value || 'Income')),
     status: $o('status').value || 'New Orders',
     photo_data: currentPhotoData || null
   };
@@ -399,6 +417,7 @@ function orderCard(order){
     </div>
     <div class="order-card-expanded" hidden style="display:none!important">
       <div class="payment-status-row">${paymentButton}</div>
+      <div class="board-meta clean-meta"><b>Finance:</b> ${escapeO(order.finance_entry_type || 'Income')} / ${escapeO(order.finance_account || defaultFinanceAccount(order.finance_entry_type || 'Income'))}</div>
       ${order.details ? `<p class="order-details-text">${escapeO(order.details).slice(0,180)}</p>` : ''}
       <div class="board-actions clean-actions compact-actions">
         <button type="button" class="soft-btn small-action-btn" onclick="editOrder(${order.id})">Edit</button>
@@ -418,16 +437,8 @@ function bindCollapseDelegates(){
   if(window.__ordersCollapseDelegatesBound) return;
   window.__ordersCollapseDelegatesBound = true;
 
+  // Native <details>/<summary> handles week collapse. This listener only handles card details.
   document.addEventListener('click', event => {
-    const weekButton = event.target.closest('.week-toggle-btn');
-    if(weekButton){
-      event.preventDefault();
-      event.stopPropagation();
-      const group = weekButton.closest('.week-group');
-      setWeekGroupCollapsed(group, !group.classList.contains('collapsed'));
-      return;
-    }
-
     const cardButton = event.target.closest('.card-expand-btn');
     if(cardButton){
       event.preventDefault();
@@ -589,19 +600,19 @@ async function postOrder(id){
       if(!paymentType){ setStatus('Payment type is required before posting.', true); return; }
     }
 
-    if(confirm(`Post Order #${o.id} to Finance as Income / Orders?`)){
+    if(confirm(`Post Order #${o.id} to Finance as ${entryType} / ${account}?`)){
       const txPayload = {
-        transaction_date: o.order_date || todayO(),
-        entry_type: 'Income',
-        account: 'Orders',
+        transaction_date: o.pickup_date || o.order_date || todayO(),
+        entry_type: entryType,
+        account: account,
         customer_name: o.customer_name || '',
         payment_type: paymentType,
-        amount: Number(o.total_amount)||0,
-        notes: `Order #${o.id} | Order Board | Pickup: ${o.pickup_date||''} | Source: ${o.media_source||''} | Details: ${o.details||''}`
+        amount: amount,
+        notes: `Order #${o.id} | Order Board | Pickup: ${o.pickup_date||''} | Finance: ${entryType} / ${account} | Source: ${o.media_source||''} | Details: ${o.details||''}`
       };
       const tx = await rest('/transactions', {method:'POST', headers:{Prefer:'return=representation'}, body:JSON.stringify(txPayload)});
-      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status:'Posted to Finance', payment_type:paymentType, posted_transaction_id:tx?.[0]?.id || null})});
-      setStatus(`Order #${o.id} posted to Finance as Income / Orders.`);
+      await rest(`/orders?id=eq.${encodeURIComponent(id)}`, {method:'PATCH', headers:{Prefer:'return=representation'}, body:JSON.stringify({status:'Posted to Finance', payment_type:paymentType, finance_entry_type:entryType, finance_account:account, posted_transaction_id:tx?.[0]?.id || null})});
+      setStatus(`Order #${o.id} posted to Finance as ${escapeO(entryType)} / ${escapeO(account)}.`);
       await renderBoard();
     }
   }catch(err){ setStatus('Post failed: '+escapeO(err.message||err), true); }
@@ -660,6 +671,24 @@ async function init(){
     if(typeof nav === 'function') $o('nav').innerHTML = nav({key:'orders', title:'Order Board', subtitle:'Digital workflow for paper order tickets'});
     else $o('nav').innerHTML = '<header class="topbar"><div class="brand"><div><h1>Order Board</h1><p>Digital workflow for paper order tickets</p></div></div></header>';
     if(typeof footer === 'function') $o('footer').innerHTML = footer();
+
+    const statusLabel = $o('status')?.closest('label');
+    if(statusLabel && !$o('financeEntryType')){
+      statusLabel.insertAdjacentHTML('afterend', `
+        <label>Finance Type
+          <select id="financeEntryType">
+            <option>Income</option>
+            <option>Donation</option>
+          </select>
+        </label>
+        <label>Finance Account
+          <select id="financeAccount">
+            <option>Orders</option>
+            <option>Donation</option>
+            <option>Other</option>
+          </select>
+        </label>`);
+    }
     $o('orderDate').value = todayO();
     $o('newOrderBtn').addEventListener('click',()=>openOrderForm(null));
     $o('refreshBtn').addEventListener('click',renderBoard);
@@ -668,6 +697,7 @@ async function init(){
     $o('saveOrderBtn').addEventListener('click',saveOrderNow);
     $o('orderForm').addEventListener('submit',e=>{e.preventDefault(); saveOrderNow();});
     $o('customerName').addEventListener('input',e=>loadCustomerNames(e.target.value));
+    $o('financeEntryType')?.addEventListener('change',syncFinanceAccount);
     clearStatus();
     await loadCustomerNames('');
     await renderBoard();
