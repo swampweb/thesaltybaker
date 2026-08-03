@@ -698,3 +698,10 @@ details.native-week-group[open] .when-open{display:inline!important;}
 
 /* Order Board finance type/account fields v4.1.30 */
 #financeEntryType,#financeAccount{background:#fffefa;}
+
+
+/* Reports month filter v4.1.32 */
+.report-filter-row{display:flex;gap:12px;align-items:end;justify-content:flex-end;flex-wrap:wrap;}
+.report-filter-label{gap:6px;font-weight:800;color:#6b5b50;min-width:120px;}
+.report-filter-label select{min-width:120px;background:#fff;}
+#reportYearHolder select{min-width:95px;}

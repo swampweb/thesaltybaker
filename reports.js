@@ -94,24 +94,79 @@ function groupSum(rows,filter,key){
 }
 
 function setReportTitles(year){
-  $('monthlyTitle').textContent = `Monthly Income vs Expenses - ${year}`;
-  $('paymentTitle').textContent = `Payment Type Split - ${year}`;
-  $('accountTitle').textContent = `Income by Account - ${year}`;
-  $('expenseTitle').textContent = `Expense Categories - ${year}`;
-  $('customerTitle').textContent = `Top 10 Customers by Sales - ${year}`;
+  const label = reportScopeLabel(year);
+  $('monthlyTitle').textContent = selectedReportMonth() === 'all' ? `Monthly Income vs Expenses - ${year}` : `Income vs Expenses - ${label}`;
+  $('paymentTitle').textContent = `Payment Type Split - ${label}`;
+  $('accountTitle').textContent = `Income by Account - ${label}`;
+  $('expenseTitle').textContent = `Expense Categories - ${label}`;
+  $('customerTitle').textContent = `Top 10 Customers by Sales - ${label}`;
+}
+
+
+
+function selectedReportMonth(){
+  const el = $('reportMonth');
+  return el ? String(el.value || 'all') : 'all';
+}
+
+function filterRowsByReportMonth(rows){
+  const selected = selectedReportMonth();
+  if(selected === 'all') return rows;
+  const monthNumber = Number(selected);
+  return rows.filter(r => Number(String(r.transaction_date || '').slice(5,7)) === monthNumber);
+}
+
+function ensureReportMonthFilter(){
+  if($('reportMonth')) return;
+  const yearSelect = $('reportYear');
+  if(!yearSelect) return;
+  const wrap = document.createElement('div');
+  wrap.className = 'report-filter-row';
+  wrap.innerHTML = `
+    <label class="report-filter-label">Year
+      <span id="reportYearHolder"></span>
+    </label>
+    <label class="report-filter-label">Month
+      <select id="reportMonth">
+        <option value="all">All Months</option>
+        <option value="1">January</option>
+        <option value="2">February</option>
+        <option value="3">March</option>
+        <option value="4">April</option>
+        <option value="5">May</option>
+        <option value="6">June</option>
+        <option value="7">July</option>
+        <option value="8">August</option>
+        <option value="9">September</option>
+        <option value="10">October</option>
+        <option value="11">November</option>
+        <option value="12">December</option>
+      </select>
+    </label>`;
+  yearSelect.parentNode.insertBefore(wrap, yearSelect);
+  $('reportYearHolder').appendChild(yearSelect);
+  $('reportMonth').onchange = load;
+}
+
+function reportScopeLabel(year){
+  const selected = selectedReportMonth();
+  if(selected === 'all') return year;
+  const monthName = months[Number(selected)-1] || 'Selected Month';
+  return `${monthName} ${year}`;
 }
 
 async function load(){
   const year=$('reportYear').value;
   setReportTitles(year);
 
-  const rows=await loadTransactions(year);
+  const allRows=await loadTransactions(year);
+  const rows=filterRowsByReportMonth(allRows);
   const monthRows=calculateMonthly(rows);
   const totals=totalsFromMonthly(monthRows);
 
   const totalIncome=Number(totals.income||0);
   const totalExpenses=Number(totals.expenses||0);
-  const totalProfit=Number(totals.income||0)-totalExpenses;
+  const totalProfit=Number(totals.net_profit||0);
 
   $('rIncome').textContent=moneyLabel(totalIncome);
   $('rExpenses').textContent=moneyLabel(totalExpenses);
@@ -154,6 +209,7 @@ async function init(){
   const years=await loadYears();
   const cur=String(new Date().getFullYear());
   $('reportYear').innerHTML=years.map(y=>`<option ${y===cur?'selected':''}>${y}</option>`).join('');
+  ensureReportMonthFilter();
   $('reportYear').onchange=load;
   await load();
 }
